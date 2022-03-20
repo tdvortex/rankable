@@ -53,6 +53,7 @@ Non-functional requirements:
     Application must be reasonably secure against intrusion
 
 Extended requirements:
+    "Have you seen": suggest movies the user has not marked as seen or unseen
     Social networking: users adding others as friends, seeing each other's movie preferences
     Cross-user analytics: determining consensus of movie preferences across all users
     Recommendations: suggesting unseen movies for users based on their preferences
