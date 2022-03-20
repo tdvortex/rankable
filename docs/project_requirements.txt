@@ -1,0 +1,59 @@
+Functional requirements:
+    Authorization:
+        Users must be able to register using their Google account
+        Users must be able to log in using their Google account
+        Users must be able to log out after logging in
+    Searching for movies:
+        Users must be able to search for a movie and be given a list of possible matches
+        Users must be able to see specific movie information for any movie in the search results
+    Detailed movie information:
+        Users must be able to view detailed information about a movie, including (but not necessarily limited to):
+            --Movie title
+            --Year of Release
+            --Image of movie poster
+            --A short description of the movie
+        Users must be able to mark a movie as "seen" or "unseen"
+        Users must be able to change a "seen" to "unseen" or "unseen" to "seen"
+        Changing a movie from "seen" to "unseen" must prompt a warning
+        Changing a movie from seen to unseen (after warning) must remove all recorded direct preferences from that movie
+    Recording movie preferences
+        Users must be able to indicate a preference for one movie over another, if doing so would not create a cyclical preference
+        Users must NOT be able to indicate a preference for one movie over another, if doing so would create a cyclical preference
+            Example: 
+                If user has recorded (A,B) and (B,C) as preferences, submissions of (C,A) must be rejected
+                If user has recorded (A,B) and (B,C) as preference, submissions of (A,C) must be accepted
+        Users must be able to request two movies to compare such that a cyclic preference would not be created with either selection
+        If no guaranteed non-cyclic preferences are possible, request for movie comparison must be rejected
+        If more than one non-cyclic comparison is possible, repeated requests for movies to compare should usually return different pairs
+            Example:
+                User movies seen: [A,B,C,D,E,F]
+                Existing user preferences: (A,B), (A,C), (B,D), (C,D), (E,F)
+                Possible suggestions: {A,E}, {A,F}, {B,C}, {B,E}, {B,F}, {C,E}, {C,F}
+                If {A,E} is suggested and the request is resubmitted, the next suggestion could be {B,C}
+                Note that even though (A,D) is a valid preference, {A,D} may not be suggested, as a submission of (D,A) would create a cycle
+    Reviewing movie preferences
+        Users must be able to request a sorted list of their seen movies
+        Sorted movie list must be consistent with movie preferences recorded by user, including indirect preferences
+        Movies must be ordered by the size of their descendent subgraph
+        Sorted list must be consistent across multiple requests, if no new preferences have been added
+        Example:
+            User movies seen: [A,B,C,D,E,F]
+            User pairwise preferences: (A,B) (A,C), (B,D), (C,D), (E,F)
+            Valid resulting preference orders: {A} + {B,C,E} + {D,F}, but not E>A
+            If preference order is stated as [A,B,C,E,D,F] subsequent
+        Users must be able to view detailed information about movies from their preference list
+
+Non-functional requirements:
+    Application must be eventually consistent; may not reach an unresolveably conflicted state for any user
+        Must not become conflicted even with multiple concurrent sessions for a single user
+    Application must be highly available
+    Application must have low latency
+    Application must be incrementally scalable
+    Application must not be excessively reliant on third-party website APIs
+    Application must be reasonably secure against intrusion
+
+Extended requirements:
+    Social networking: users adding others as friends, seeing each other's movie preferences
+    Cross-user analytics: determining consensus of movie preferences across all users
+    Recommendations: suggesting unseen movies for users based on their preferences
+    Advanced movie relational data: finding genres, actors, and directors which a user prefers
