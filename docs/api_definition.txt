@@ -1,0 +1,69 @@
+Calls marked with * require active user session.
+
+
+/auth
+    register(user_id, password) -> None
+        Creates a user with user_id and password.
+        Should redirect to OAuth2--do NOT store passwords!
+        Inserts user_id into "users" table if able.
+    login(user_id, password) -> None
+        If password is correct, ends existing user session and logs in new user.
+        If not, returns a warning but does not log out existing user
+    *logout() -> None
+        If user has an existing session, ends that session.
+        Otherwise throws a warning and does nothing.
+
+    Views: navbar at top of page
+
+/search
+    search(search_terms) -> list of search results
+        Search results must have:
+            Movie ID
+            Movie name
+            Movie year of release (to distinguish remakes)
+            A hyperlink to /details/<movie ID>
+    View page: /search, /search/results/<search terms>
+/compare
+    *get_compare_pair(user_id) -> movie_id_1, movie_id_2
+        Returns a pair of movie IDs not yet compared by user.
+        Movies must not create a conflict when compared.
+        If there are no movies that meet this criteria, indicate that.
+    *rank(user_id, better_movie_id, worse_movie_id) -> bool
+        Attempt to insert the preference into the movie graph.
+        If either movie id is currently unseen, rejects response(405 Bad Request)
+        If doing so would create a cycle, response is rejected (400 Bad Request)
+    
+    View page: /compare
+        View page must show movie names, years of release, and poster images.
+
+/details
+    get_details(movie_id, {user_id}) -> JSON
+        Returns detailed movie information including:
+            Movie title
+            Year of Release
+            Image of movie poster
+            Short description of movie
+            If user_id is passed, whether the user has marked the movie as seen or unseen
+    *mark_seen(user_id, movie_id)
+        If movie is currently not marked or is marked as unseen, marks movie as seen.
+        If movie is currently marked as seen, does nothing (202 Accepted rather than 200 OK)
+    *mark_unseen(user_id, movie_id)
+        If movie is currently not marked, marks movie as unseen (201 Created)
+        If movie is currently marked as unseen, does nothing (202 Accepted)
+        If movie is currently marked as seen, warns the user to request confirmation.
+            If confirmed, removes all preferences for this movie for this user (201 Created)
+            If confirmation denied, does nothing (202 OK)
+
+    View page: /details/<movie_id>
+
+/list
+    *get_list(user_id) -> JSON
+        Returns a list of all movies the user has marked as seen,
+        in an order created by a topological sort (most preferred to least).
+        Each movie rank have:
+            A numerical rank (1 = most favorite or tied for most favorite, 2 = second or tied for second, etc.)
+            Name of the movie
+            Year of movie's release
+            Hyperlink to /details/<movie_id>
+
+    View page: /list
