@@ -1,0 +1,55 @@
+Data storage and database types:
+
+1. Search index (Elasticsearch)
+    Allow users to search movies by name, year, and description.
+    Returns a list of movie ID along with name and year.
+    Sharding: by movie IDs.
+        Search requests will hit all shards, returning any hits.
+    Consistency requirements: low. Prefer high availability/low latency.
+    Optimization: read-heavy (minimal writes)
+
+2. User metadata (SQLite)
+    Basic user information table.
+    Key: User ID
+    Foreign keys: None
+    Data columns:
+        Username
+        Account creation date+time.
+        (more in the future)
+        Note: NO PASSWORDS. Make OAuth2 handle that.
+    Sharding: by user ID
+    Consistency requirements: low. Prefer high availability/low latency.
+    Optimization: read-heavy (writes only on new user registration)
+
+3. Movie metadata(SQLite)
+    Movie metadata information.
+    Key: movie ID
+        Should be the same as IMDB. 
+    Foreign keys: None
+    Data columns:
+        Movie name
+        Movie year of release
+        Movie blurb (from IMDB)
+        Movie poster key
+    Sharding: by movie ID
+    Consistency requirements: low. Prefer high availability/low latency.
+    Optimization: read-heavy (minimal writes)
+
+4. Movie graph database (Neo4j)
+    User preference data.
+    Vertices:
+        USER: {user_id}
+        MOVIE: {movie_id}
+    Edges:
+        USER-[HAS_SEEN]->MOVIE
+        USER-[HAS_NOT_SEEN]->MOVIE
+        MOVIE-[IS_PREFERRED_BY{user_id}]->MOVIE
+    Consistency requirements: high. Must be ACID compliant with additional restrictions to prevent cycles.
+    Optimization: fairly even balance of reads/writes. 
+
+5. Movie poster file store (file directory, or HDFS, or S3)
+    Movie poster images.
+    Keys: movie poster key (default: same as movie ID)
+    Values: a PNG or JPEG of the movie poster.
+    Consistency requirements: low. Prefer high availability/low latency.
+    Optimization: read-heavy (minimal writes)
