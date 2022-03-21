@@ -1,0 +1,32 @@
+SERVICE: movie search
+    Frontend: /search, /search/results?<query>
+        /search: form to search for a movie. 
+            Search terms passed to API for add_to_index
+            Redirects to /search/results/
+        /search/results?<query>
+            Shows links formatted as hyperlinks for <a>Movie Name (YYYY)</a>, most relevant results first
+            If no results, say "Sorry! We couldn't find <reproduce query>"
+
+    Logic:
+        init_search_db()
+            Initializes search database.
+        get_search_db()
+            Helper function to open search database
+        add_to_index(movie_id, movie_name, movie_year, ...)
+            Adds a movie to ElasticSearch index.
+        search_db(search_terms)
+            Sends query to ElasticSearch database and returns movie_id and movie_name as results
+    Database: ElasticSearch
+
+
+SERVICE: User management
+    Frontend: /login, /register, /logout
+        If user is logged out, have links for "Register" and "Log in" at the top of any accessible page
+        If user is logged in, have link for "Log Out" instead in that same location
+    
+    Logic: redirects to OAuth2 and then hands back results to other functions.
+        init_user_db()
+        get_user_db()
+        add_user()
+
+    Database: SQLite3 user database
