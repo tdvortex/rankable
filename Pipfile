@@ -9,6 +9,9 @@ django-debug-toolbar = "*"
 psycopg2 = "*"
 
 [dev-packages]
+pytest = "*"
+pytest-django = "*"
+pytest-watch = "*"
 
 [requires]
 python_version = "3.10"
