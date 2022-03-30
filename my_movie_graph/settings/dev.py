@@ -11,3 +11,18 @@ SECRET_KEY = 'django-insecure-)6uuj=j=0*ph0gq^1mrgt*y@a4&4li@heb8%=h7jcw1(hgtr5w
 DEBUG = True
 
 ALLOWED_HOSTS = []
+
+# Database
+# https://docs.djangoproject.com/en/4.0/ref/settings/#databases
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'my_movie_graph',
+        'USER': 'ben_wilson',
+        'HOST': 'localhost',
+        'PORT': 5432,
+        'OPTIONS': {
+            'passfile': '.mmg_pass'
+        }
+    }
+}
