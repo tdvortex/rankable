@@ -27,7 +27,8 @@ INSTALLED_APPS = [
     'debug_toolbar',
     'users',
     'movies',
-    'preferences'
+    'preferences',
+    'core'
 ]
 
 MIDDLEWARE = [
