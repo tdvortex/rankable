@@ -25,6 +25,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'debug_toolbar',
+    'rest_framework',
+    'djoser',
     'users',
     'movies',
     'preferences',
@@ -108,3 +110,20 @@ INTERNAL_IPS = [
 ]
 
 AUTH_USER_MODEL = 'users.User'
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication'
+    )
+}
+
+SIMPLE_JWT = {
+    'AUTH_HEADER_TYPES': ('JWT',),
+}
+
+DJOSER = {
+    'SERIALIZERS': {
+        'user_create' : 'users.serializers.UserCreateSerializer',
+        'current_user': 'users.serializers.UserSerializer',
+    }
+}
