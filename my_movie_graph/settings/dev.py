@@ -18,7 +18,7 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'my_movie_graph',
-        'USER': 'ben_wilson',
+        'USER': 'postgres',
         'HOST': 'localhost',
         'PORT': 5432,
         'OPTIONS': {
