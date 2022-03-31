@@ -1,8 +1,8 @@
 Functional requirements:
     Authorization:
-        Users must be able to register using their Google account
-        Users must be able to log in using their Google account
-        Users must be able to log out after logging in
+        Users must be able to register
+        Users must be able to log in
+        Users must be able to log out
     Searching for movies:
         Users must be able to search for a movie and be given a list of possible matches
         Users must be able to see specific movie information for any movie in the search results
@@ -24,7 +24,6 @@ Functional requirements:
                 If user has recorded (A,B) and (B,C) as preference, submissions of (A,C) must be accepted
         Users must be able to request two movies to compare such that a cyclic preference would not be created with either selection
         If no guaranteed non-cyclic preferences are possible, request for movie comparison must be rejected
-        If more than one non-cyclic comparison is possible, repeated requests for movies to compare should usually return different pairs
             Example:
                 User movies seen: [A,B,C,D,E,F]
                 Existing user preferences: (A,B), (A,C), (B,D), (C,D), (E,F)

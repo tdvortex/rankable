@@ -1,26 +1,16 @@
-Deployment infrastructure: Docker
+Deployment infrastructure: Docker on Heroku
     Rationale:
-        As userbase grows, load on services will change asymmetrically.
-        Movie data will grow slowly, user metadata will grow slowly, but user metadata will grow rapidly.
-        As a result, asymmetric scalability will be important.
-        Docker enables easy scaling and reduced dependency on backend-as-a-service.
+        Consistency between dev and prod environments
+        Some dependencies may not support Windows, or might just be easier as a container
+        Initial deployment will be single-instance but Docker improves future scalability improvements
+        Heroku supports Postgres out of the box and has good free tiers
 
 Backend platform: Django
     Python has useful libraries for all necessary database types.
     The "batteries included" design of Django will be more useful than Flask in handling interconnectedness.
 
-Inter-service communication: JSON
-    Widely used standard, interpretable by Python's json library.
+Authentication: Djoser with JWTs
+    Reduces load on SQL database
 
-Documentation: Sphinx
-    Standard of practice for Python applications.
-
-Authentication: OAuth2
-    Users should not have to log in multiple times between services.
-    Handling passwords and security is something best left to the professionals.
-
-Testing platform: pytest with coverage
+Testing platform: pytest
     Reliable, high-quality testing platform.
-
-UI design: Resource-oriented architecture
-    Javascript is hard and this website will be just fine with static HTML. 
