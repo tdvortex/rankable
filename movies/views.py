@@ -1,5 +1,6 @@
 
-from django.shortcuts import render
+from django.views.decorators.cache import cache_page
+from django.utils.decorators import method_decorator
 from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
 from django.contrib.postgres.aggregates import StringAgg
 from rest_framework import status
@@ -26,6 +27,11 @@ class MovieViewSet(ReadOnlyModelViewSet):
     queryset = Movie.objects.all()
     serializer_class = SimpleMovieSerializer
 
+    @method_decorator(cache_page(60*60))
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+    @method_decorator(cache_page(60 * 60))
     def retrieve(self, request, *args, **kwargs):
         movie = Movie.objects.prefetch_related('genres').prefetch_related(
             'stars').filter(id=kwargs['pk']).first()
@@ -35,7 +41,9 @@ class MovieViewSet(ReadOnlyModelViewSet):
         serializer = MovieSerializer(movie)
         return Response(serializer.data)
 
+
     @action(detail=False)
+    @method_decorator(cache_page(5 * 60))
     def search(self, request):
         search_vector = SearchVector('title', 'year', weight='A')
         search_vector += SearchVector(StringAgg('stars__name', delimiter=' '),

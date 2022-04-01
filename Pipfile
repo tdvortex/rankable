@@ -10,6 +10,7 @@ psycopg2 = "*"
 djangorestframework = "*"
 djoser = "*"
 djangorestframework-simplejwt = "*"
+django-redis = "*"
 
 [dev-packages]
 pytest = "*"
