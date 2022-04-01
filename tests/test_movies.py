@@ -47,6 +47,11 @@ def search_movie(api_client):
 
 @pytest.mark.django_db
 class TestSearchMovie:
+    def test_if_no_query_returns_400(self, search_movie):
+        response = search_movie('')
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
     def test_if_no_matching_movies_returns_empty_and_200(self, search_movie):
         response = search_movie('anything')
 

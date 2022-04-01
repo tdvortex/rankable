@@ -74,4 +74,5 @@ def do_populate_movies():
             star, created = Star.objects.get_or_create(name=star_name)
             Movie.stars.through.objects.get_or_create(star=star, movie=new_movie)
 
-    return Response(status=status.HTTP_201_CREATED)
+    content = {'message': 'Movies {} through {} created'.format(offset, offset+250)}
+    return Response(data=content, status=status.HTTP_201_CREATED)

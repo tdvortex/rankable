@@ -36,7 +36,7 @@ class MovieViewSet(ReadOnlyModelViewSet):
         movie = Movie.objects.prefetch_related('genres').prefetch_related(
             'stars').filter(id=kwargs['pk']).first()
         if not movie:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+            return Response(data={'error': 'No movie with id {} found'.format(kwargs['pk'])}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = MovieSerializer(movie)
         return Response(serializer.data)
@@ -51,6 +51,10 @@ class MovieViewSet(ReadOnlyModelViewSet):
         search_vector += SearchVector(StringAgg('genres__name', delimiter=' '),
                                       weight='B')
         search_vector += SearchVector('plot', 'content_rating', weight='D')
+
+        query = self.request.GET.get('q')
+        if not query:
+            return Response(data={'error': 'Search query is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         search_query = SearchQuery(self.request.GET.get('q'))
         search_rank = SearchRank(vector=search_vector, query=search_query)
