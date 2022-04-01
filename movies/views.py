@@ -1,6 +1,4 @@
-import json
 import os
-from django.db import IntegrityError
 import requests
 from django.conf import settings
 from django.shortcuts import render
@@ -8,7 +6,9 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAdminUser
+from rest_framework.viewsets import ReadOnlyModelViewSet
 from .models import Movie, Star, Genre
+from .serializers import MovieSerializer, SimpleMovieSerializer
 
 
 @api_view(http_method_names=['GET', 'POST'])
@@ -33,10 +33,6 @@ def populate_movies(request):
 
     response = requests.request("GET", url, headers={}, data={})
     results = response.json()['results']
-    # f = open('imdb.json', 'r')
-    # response = f.read()
-    # f.close()
-    # results = json.loads(response)['results']
 
     for movie in results:
         id = movie['id']
@@ -74,3 +70,12 @@ def populate_movies(request):
             Movie.stars.through.objects.get_or_create(star=star, movie=new_movie)
 
     return Response(status=status.HTTP_201_CREATED)
+
+class MovieViewSet(ReadOnlyModelViewSet):
+    queryset = Movie.objects.all()
+    serializer_class = SimpleMovieSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        movie = Movie.objects.prefetch_related('genres').prefetch_related('stars').filter(id=kwargs['pk']).first()
+        serializer = MovieSerializer(movie)
+        return Response(serializer.data)
