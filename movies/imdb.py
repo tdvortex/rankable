@@ -37,6 +37,8 @@ def do_populate_movies():
 
     results = json_data['results']
 
+    created_movies = []
+
     for movie in results:
         id = movie['id']
         title = movie['title']
