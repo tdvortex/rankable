@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "e520d653156b069b2019bc489cc9094736dadc34d1415e454bc9c430ac8c76f1"
+            "sha256": "104753d8efe01aa5ed240596f5759aa7d8f93f14d20b7b788a8310b93bd9ff9e"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -282,6 +282,13 @@
             "markers": "python_version >= '3.7'",
             "version": "==2.1.1"
         },
+        "neo4j": {
+            "hashes": [
+                "sha256:58f289c4210310740de429d3daef6d6a972c247aeba6820f2fcba4b04bb56204"
+            ],
+            "index": "pypi",
+            "version": "==4.4.2"
+        },
         "oauthlib": {
             "hashes": [
                 "sha256:23a8208d75b902797ea29fd31fa80a15ed9dc2c6c16fe73f5d346f83f6fa27a2",
@@ -429,7 +436,7 @@
                 "sha256:44ece4d53fb1706f667c9bd1c648f5469a2ec925fcf3a776667042d645472c14",
                 "sha256:aabaf16477806a5e1dd19aa41f8c2b7950dd3c746362d7e3223dbe6de6ac448e"
             ],
-            "markers": "python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3, 3.4' and python_full_version < '4.0.0'",
+            "markers": "python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3, 3.4' and python_version < '4'",
             "version": "==1.26.9"
         },
         "wrapt": {
