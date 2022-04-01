@@ -1,5 +1,6 @@
 import os
 import requests
+import json
 from django.conf import settings
 from rest_framework.response import Response
 from rest_framework import status
@@ -15,13 +16,26 @@ def do_populate_movies():
 
     offset = Movie.objects.count() + 1
 
-    url = "https://imdb-api.com/API/AdvancedSearch/" + key
-    url += "?title_type=feature&count=250&sort=num_votes,desc"
-    if offset is not None:
-        url += "&start=" + str(offset)
+    filename = '.imdb/' + str(offset) + '.json'
 
-    response = requests.request("GET", url, headers={}, data={})
-    results = response.json()['results']
+    if settings.DEBUG and os.path.exists(filename):
+        f = open(filename, 'r')
+        json_data = json.loads(f.read())
+        f.close()
+    else:
+        url = "https://imdb-api.com/API/AdvancedSearch/" + key
+        url += "?title_type=feature&count=250&sort=num_votes,desc"
+        if offset is not None:
+            url += "&start=" + str(offset)
+        response = requests.request("GET", url, headers={}, data={})
+        json_data = response.json()
+
+        if settings.DEBUG:
+            f = open(filename, 'w')
+            f.write(json.dumps(json_data))
+            f.close()
+
+    results = json_data['results']
 
     for movie in results:
         id = movie['id']
