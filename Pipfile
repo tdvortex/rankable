@@ -12,6 +12,8 @@ djoser = "*"
 djangorestframework-simplejwt = "*"
 django-redis = "*"
 neo4j = "*"
+neomodel = {ref = "update-Shapely", git = "https://github.com/neo4j-contrib/neomodel.git"}
+django-neomodel = "*"
 
 [dev-packages]
 pytest = "*"
