@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.permissions import IsAdminUser
 from rest_framework.viewsets import ReadOnlyModelViewSet
+from rest_framework import status
 from .models import Movie
 from .serializers import MovieSerializer, SimpleMovieSerializer
 from .imdb import do_populate_movies
@@ -28,21 +29,26 @@ class MovieViewSet(ReadOnlyModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         movie = Movie.objects.prefetch_related('genres').prefetch_related(
             'stars').filter(id=kwargs['pk']).first()
+        if not movie:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
         serializer = MovieSerializer(movie)
         return Response(serializer.data)
 
     @action(detail=False)
     def search(self, request):
         search_vector = SearchVector('title', 'year', weight='A')
-        search_vector += SearchVector(StringAgg('stars__name',
-                                      delimiter=' '), weight='B')
-        search_vector += SearchVector(StringAgg('genres__name',
-                                      delimiter=' '), weight='B')
+        search_vector += SearchVector(StringAgg('stars__name', delimiter=' '),
+                                      weight='B')
+        search_vector += SearchVector(StringAgg('genres__name', delimiter=' '),
+                                      weight='B')
         search_vector += SearchVector('plot', 'content_rating', weight='D')
 
         search_query = SearchQuery(self.request.GET.get('q'))
         search_rank = SearchRank(vector=search_vector, query=search_query)
-        queryset = Movie.objects.annotate(rank=search_rank).filter(
-            search_vector=search_query).order_by('-rank')
+        queryset = Movie.objects.annotate(search=search_vector,
+                                          rank=search_rank
+                                          ).filter(search=search_query
+                                                   ).order_by('-rank')
         serializer = SimpleMovieSerializer(queryset, many=True)
         return Response(serializer.data)
