@@ -12,7 +12,7 @@ class TestListMovies:
         response = api_client.get('/api/movies/')
 
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data) == 2
+        assert len(response.data['results']) == 2
 
 
 @pytest.fixture

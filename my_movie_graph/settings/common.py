@@ -115,7 +115,9 @@ AUTH_USER_MODEL = 'users.User'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    )
+    ),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
+    'PAGE_SIZE': 100
 }
 
 SIMPLE_JWT = {
@@ -125,8 +127,7 @@ SIMPLE_JWT = {
 
 DJOSER = {
     'SERIALIZERS': {
-        'user_create' : 'users.serializers.UserCreateSerializer',
+        'user_create': 'users.serializers.UserCreateSerializer',
         'current_user': 'users.serializers.UserSerializer',
     }
 }
-
