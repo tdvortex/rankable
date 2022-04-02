@@ -21,5 +21,6 @@ urlpatterns = [
     path('', include('core.urls')),
     path('api/auth/', include('djoser.urls')),
     path('api/auth/', include('djoser.urls.jwt')),
-    path('__debug__/', include('debug_toolbar.urls'))
+    path('api/movies/', include('movies.urls')),
+    path('__debug__/', include('debug_toolbar.urls')),
 ]

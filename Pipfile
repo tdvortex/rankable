@@ -10,12 +10,14 @@ psycopg2 = "*"
 djangorestframework = "*"
 djoser = "*"
 djangorestframework-simplejwt = "*"
+django-redis = "*"
 
 [dev-packages]
 pytest = "*"
 pytest-django = "*"
 pytest-watch = "*"
 model-bakery = "*"
+autopep8 = "*"
 
 [requires]
 python_version = "3.10"
