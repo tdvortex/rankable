@@ -36,3 +36,5 @@ CACHES = {
         }
     }
 }
+
+NEOMODEL_NEO4J_BOLT_URL = 'bolt://localhost:7687/neo4j'
