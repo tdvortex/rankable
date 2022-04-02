@@ -1,0 +1,16 @@
+Deployment infrastructure: Docker on Heroku
+    Rationale:
+        Consistency between dev and prod environments
+        Some dependencies may not support Windows, or might just be easier as a container
+        Initial deployment will be single-instance but Docker improves future scalability improvements
+        Heroku supports Postgres out of the box and has good free tiers
+
+Backend platform: Django
+    Python has useful libraries for all necessary database types.
+    The "batteries included" design of Django will be more useful than Flask in handling interconnectedness.
+
+Authentication: Djoser with JWTs
+    Reduces load on SQL database
+
+Testing platform: pytest
+    Reliable, high-quality testing platform.

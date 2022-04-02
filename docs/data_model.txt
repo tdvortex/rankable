@@ -1,0 +1,39 @@
+Data storage and database types:
+
+1. User metadata (Postgres)
+    Basic user information table.
+    Default structure for Django, but also with a GUID for easier sync to Neo4j
+
+2. Movie metadata(Postgres)
+    Movie metadata information.
+    Key: movie ID
+    Foreign keys: None
+    Data columns:
+        IMDB movie key
+        Movie name
+        Movie year of release
+        Movie blurb (from IMDB)
+        Movie poster key
+        Other IMDB data
+    Sharding: by movie ID
+    Consistency requirements: low. Prefer high availability/low latency.
+    Optimization: read-heavy (minimal writes), with 
+
+3. Movie graph database (Neo4j)
+    User preference data.
+    Vertices:
+        USER: {user_id}
+        MOVIE: {movie_id}
+    Edges:
+        USER-[HAS_SEEN]->MOVIE
+        USER-[HAS_NOT_SEEN]->MOVIE
+        MOVIE-[IS_PREFERRED_BY{user_id}]->MOVIE
+    Consistency requirements: high. Must be ACID compliant with additional restrictions to prevent cycles.
+    Optimization: fairly even balance of reads/writes. 
+
+4. Movie poster file store (file directory or S3)
+    Movie poster images.
+    Keys: movie poster key (default: same as movie ID)
+    Values: a PNG or JPEG of the movie poster.
+    Consistency requirements: low. Prefer high availability/low latency.
+    Optimization: read-heavy (minimal writes)
