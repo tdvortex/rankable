@@ -1,24 +1,5 @@
-from .models import Item, Ranker, PreferredToByRel
+from .models import Item, Ranker
 from neomodel import db
-
-
-def insert_ranker(ranker_id:str)->bool:
-    try:
-        ranker = Ranker(ranker_id)
-        ranker.save()
-    except Exception as e:
-        print(e)
-        return False
-    return True
-
-def insert_item(item_id:str)->bool:
-    try:
-        ranker = Item(item_id)
-        ranker.save()
-    except Exception as e:
-        print(e)
-        return False
-    return True
 
 def is_valid_preference(ranker: Ranker, preferred: Item, nonpreferred: Item) -> bool:
     if (ranker.knows.first_or_none(preferred.item_id) is None
@@ -30,22 +11,26 @@ def is_valid_preference(ranker: Ranker, preferred: Item, nonpreferred: Item) -> 
     query += f"WHERE i.item_id='{preferred.item_id}', j.item_id='{nonpreferred.item_id}', r.by='{ranker.ranker_id}')"
 
     results, _ = db.cypher_query(query)
-    return results[0]
+    return results[0][0]
 
-def insert_preference(ranker: Ranker, preferred: Item, nonpreferred: Item) -> bool:
+def insert_preference(ranker: Ranker, preferred: Item, nonpreferred: Item):
     if not is_valid_preference(ranker, preferred, nonpreferred):
-        return False
+        return 'Invalid'
     
-    query = f"MATCH (i:Item), (j:Item) WHERE i.item_id ='{preferred.item_id}', j.item_id ='{nonpreferred.item_id}'"
-    query += f"MERGE (i)-[:PREFERRED_TO_BY {{by:'{ranker.id}'}}]->(j)"
+    query = f"MATCH (i:Item), (j:Item) WHERE i.item_id ='{preferred.item_id}', j.item_id ='{nonpreferred.item_id}' "
+    query += f"MERGE (i)-[:PREFERRED_TO_BY {{by:'{ranker.ranker_id}'}}]->(j) "
+    query += f"ON MATCH RETURN 'Exists' "
+    query += f"ON CREATE RETURN 'Created'"
 
-    try:
-        db.cypher_query(query)
-    except Exception as e:
-        print(e)
-        return False
-    else:
-        return True
+    results, _ = db.cypher_query(query)
+    return results[0][0]
+
+def direct_preference_exists(ranker:Ranker, preferred:Item, nonpreferred:Item):
+    query = f"RETURN exists((i:Item)-[r:PREFERRED_TO_BY]->(j:Item)) "
+    query += f"WHERE i.item_id ='{preferred.item_id}', j.item_id ='{nonpreferred.item_id}', r.by='{ranker.ranker_id}'"
+
+    results, _ = db.cypher_query(query)
+    return results[0][0]
 
 def get_direct_preferences(ranker: Ranker) -> list[tuple[Item, Item]]:
     query = f"MATCH (i:Item)-[:PREFERRED_TO_BY {{by:'{ranker.ranker_id}'}}]->(j:Item) RETURN i,j"
