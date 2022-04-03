@@ -2,21 +2,24 @@ from neomodel import StructuredNode, StructuredRel, StringProperty, Relationship
 from neomodel.cardinality import One
 
 
-class PreferredToByRel(StructuredRel):
-    by = StringProperty(required=True)
+# class PreferredToByRel(StructuredRel):
+#     by = StringProperty(required=True)
 
 class Item(StructuredNode):
     '''Profile for a an item which rankes prefer over other items'''
     item_id = StringProperty(required=True, unique_index=True)
 
-    preferred_to_by = RelationshipTo('Item', 'PREFERRED_TO_BY', model=PreferredToByRel)
+    #preferred_to_by = RelationshipTo('Item', 'PREFERRED_TO_BY', model=PreferredToByRel)
 
 
 class Ranker(StructuredNode):
     '''Profile for a user who provides rankings for items'''
     ranker_id = StringProperty(required=True, unique_index=True)
 
-    knows = RelationshipTo(Item, 'KNOWS', cardinality=One)
+    #knows = RelationshipTo(Item, 'KNOWS', cardinality=One)
+
+
+
 
 # Syntax examples
 
