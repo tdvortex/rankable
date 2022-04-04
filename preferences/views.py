@@ -4,7 +4,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from .models import Ranker, Item
-from .cypher import (delete_direct_preference, delete_ranker, delete_ranker_knows, direct_preference_exists,
+from .cypher import (delete_direct_preference, delete_item, delete_ranker, delete_ranker_knows, direct_preference_exists,
                      get_direct_preferences, insert_preference, insert_ranker_knows, ranker_knows_item)
 from .serializers import RankerSerializer, ItemSerializer
 
@@ -24,7 +24,7 @@ def item_list(request):
         else:
             return Response(data={'validation_error': 'Invalid data'}, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['GET'])
+@api_view(['GET', 'DELETE'])
 def item_detail(request, item_id:str):
     # Check if item exists
     item = Item.nodes.first_or_none(item_id=item_id)
@@ -34,6 +34,9 @@ def item_detail(request, item_id:str):
     if request.method == 'GET':
         serializer = ItemSerializer(item)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
+    elif request.method == 'DELETE':
+        delete_item(item)
+        return Response(status=status.HTTP_204_NO_CONTENT) 
 
 @api_view(['GET', 'POST'])
 def ranker_list(request):

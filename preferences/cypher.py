@@ -74,7 +74,6 @@ def get_direct_preferences(ranker: Ranker) -> list[tuple[Item, Item]]:
 # Delete operations
 
 def delete_direct_preference(ranker: Ranker, preferred: Item, nonpreferred: Item):
-    # Do as an atomic transaction
     db.begin()
     try:
         if not direct_preference_exists:
@@ -92,7 +91,6 @@ def delete_direct_preference(ranker: Ranker, preferred: Item, nonpreferred: Item
         raise e
 
 def delete_ranker_knows(ranker:Ranker, item:Item):
-    # Make this an atomic transaction
     db.begin()
     try:
         # Delete all direct preferences the ranker has for this item in both directions
@@ -113,7 +111,6 @@ def delete_ranker_knows(ranker:Ranker, item:Item):
         raise e
 
 def delete_ranker(ranker:Ranker):
-    # Make this an atomic transaction
     db.begin()
     try:
         # Delete all preferences the ranker has for all items in both directions
@@ -130,6 +127,20 @@ def delete_ranker(ranker:Ranker):
         del_ranker_query = f"MATCH (x:Ranker {{ranker_id = '{ranker.ranker_id}'}}) DELETE x"
         db.cypher_query(del_ranker_query)
 
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise e
+
+def delete_item(item:Item):
+    db.begin()
+    try:
+        # Detach item from other items (removing preferences for all rankers)
+        # Detach item from rankers (removing known relationships)
+        # Then delete item
+        del_preference_query = f"MATCH (i:Item {{item_id = '{item.item_id}'}}) "
+        del_preference_query += f"DETACH DELETE i"
+        db.cypher_query(del_preference_query)
         db.commit()
     except Exception as e:
         db.rollback()
