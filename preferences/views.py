@@ -4,7 +4,8 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from .models import Ranker, Item
-from .cypher import get_direct_preferences, direct_preference_exists, insert_preference, ranker_knows_item, insert_ranker_knows
+from .cypher import (get_direct_preferences, direct_preference_exists, insert_preference,
+                     ranker_knows_item, insert_ranker_knows, delete_direct_preference)
 from .serializers import RankerSerializer, ItemSerializer
 
 
@@ -140,3 +141,6 @@ def ranker_pairwise_preference(request, ranker_id: str, preferred_id: str, nonpr
                                 ItemSerializer(nonpreferred).data]),
                 status=status.HTTP_201_CREATED
             )
+    elif request.method == 'DELETE':
+        delete_direct_preference(ranker, preferred, nonpreferred)
+        return Response(status=status.HTTP_204_NO_CONTENT)
