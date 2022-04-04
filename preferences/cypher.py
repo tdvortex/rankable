@@ -1,16 +1,32 @@
 from .models import Item, Ranker
 from neomodel import db
 
+
+def ranker_knows_item(ranker: Ranker, item: Item) -> bool:
+    query = f"RETURN exists(x:Ranker)-[:KNOWS]->(i:item) "
+    query += f"WHERE x.ranker_id='{ranker.ranker_id}', i.item_id='{item.item_id}'"
+
+    results, _ = db.cypher_query(query)
+    return results[0][0]
+
+def insert_ranker_knows(ranker: Ranker, item: Item):
+    query = f"MERGE (x:Ranker {{ranker_id = '{ranker.ranker_id}'}})-[:KNOWS]->(i:Item {{item_id=='{item.item_id}'}}) "
+    query += f"ON MATCH RETURN 'Exists' "
+    query += f"ON CREATE RETURN 'Created'"
+
+    results, _ = db.cypher_query(query)
+    return results[0][0]
+
 def is_valid_preference(ranker: Ranker, preferred: Item, nonpreferred: Item) -> bool:
-    if (ranker.knows.first_or_none(preferred.item_id) is None
-            or ranker.knows.first_or_none(nonpreferred.item_id) is None):
+    if not ranker_knows_item(ranker, preferred) or not ranker_knows_item(ranker, nonpreferred):
         # Ranker must know both items to be have a preference
         return False
 
-    query = f"RETURN NOT exists((j:Item)-[r:PREFERRED_TO_BY*]->(i:Item) "
-    query += f"WHERE i.item_id='{preferred.item_id}', j.item_id='{nonpreferred.item_id}', r.by='{ranker.ranker_id}')"
+    # Preference must not violate existing preferences and create a cycle
+    cyclic_query = f"RETURN NOT exists((j:Item)-[r:PREFERRED_TO_BY*]->(i:Item) "
+    cyclic_query += f"WHERE i.item_id='{preferred.item_id}', j.item_id='{nonpreferred.item_id}', r.by='{ranker.ranker_id}'"
 
-    results, _ = db.cypher_query(query)
+    results, _ = db.cypher_query(cyclic_query)
     return results[0][0]
 
 def insert_preference(ranker: Ranker, preferred: Item, nonpreferred: Item):
