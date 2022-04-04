@@ -11,5 +11,5 @@ class RankerAdmin(dj_admin.ModelAdmin):
     list_display = ['ranker_id']
 
 
-neo_admin.register(Ranker, ItemAdmin)
-neo_admin.register(Item, RankerAdmin)
+neo_admin.register(Ranker, RankerAdmin)
+neo_admin.register(Item, ItemAdmin)

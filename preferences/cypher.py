@@ -3,14 +3,14 @@ from neomodel import db
 
 # Boolean checks
 def ranker_knows_item(ranker: Ranker, item: Item) -> bool:
-    query = f"RETURN exists(x:Ranker)-[:KNOWS]->(i:item) "
+    query = "RETURN exists(x:Ranker)-[:KNOWS]->(i:item) "
     query += f"WHERE x.ranker_id='{ranker.ranker_id}', i.item_id='{item.item_id}'"
 
     results, _ = db.cypher_query(query)
     return results[0][0]
 
 def direct_preference_exists(ranker: Ranker, preferred: Item, nonpreferred: Item):
-    query = f"RETURN exists((i:Item)-[r:PREFERRED_TO_BY]->(j:Item)) "
+    query = "RETURN exists((i:Item)-[r:PREFERRED_TO_BY]->(j:Item)) "
     query += f"WHERE i.item_id ='{preferred.item_id}', j.item_id ='{nonpreferred.item_id}', r.by='{ranker.ranker_id}'"
 
     results, _ = db.cypher_query(query)
@@ -24,7 +24,7 @@ def is_valid_preference(ranker: Ranker, preferred: Item, nonpreferred: Item) -> 
             return False
 
         # Preference must not violate existing preferences and create a cycle
-        cyclic_query = f"RETURN NOT exists((j:Item)-[r:PREFERRED_TO_BY*]->(i:Item) "
+        cyclic_query = "RETURN NOT exists((j:Item)-[r:PREFERRED_TO_BY*]->(i:Item) "
         cyclic_query += f"WHERE i.item_id='{preferred.item_id}', j.item_id='{nonpreferred.item_id}', r.by='{ranker.ranker_id}'"
 
         results, _ = db.cypher_query(cyclic_query)
@@ -37,9 +37,10 @@ def is_valid_preference(ranker: Ranker, preferred: Item, nonpreferred: Item) -> 
 # Create operations
 
 def insert_ranker_knows(ranker: Ranker, item: Item):
-    query = f"MERGE (x:Ranker {{ranker_id = '{ranker.ranker_id}'}})-[:KNOWS]->(i:Item {{item_id='{item.item_id}'}}) "
-    query += f"ON MATCH RETURN 'Exists' "
-    query += f"ON CREATE RETURN 'Created'"
+    query = "MERGE (x:Ranker)-[:KNOWS]->(i:Item) "
+    query += f"WHERE x.ranker_id='{ranker.ranker_id}', i.item_id='{item.item_id}'"
+    query += "ON MATCH RETURN 'Exists' "
+    query += "ON CREATE RETURN 'Created'"
 
     results, _ = db.cypher_query(query)
     return results[0][0]
@@ -50,10 +51,11 @@ def insert_preference(ranker: Ranker, preferred: Item, nonpreferred: Item):
         if not is_valid_preference(ranker, preferred, nonpreferred):
             return 'Invalid'
 
-        query = f"MATCH (i:Item), (j:Item) WHERE i.item_id ='{preferred.item_id}', j.item_id ='{nonpreferred.item_id}' "
+        query = "MATCH (i:Item), (j:Item) "
+        query += f"WHERE i.item_id ='{preferred.item_id}', j.item_id ='{nonpreferred.item_id}' "
         query += f"MERGE (i)-[:PREFERRED_TO_BY {{by:'{ranker.ranker_id}'}}]->(j) "
-        query += f"ON MATCH RETURN 'Exists' "
-        query += f"ON CREATE RETURN 'Created'"
+        query += "ON MATCH RETURN 'Exists' "
+        query += "ON CREATE RETURN 'Created'"
 
         results, _ = db.cypher_query(query)
         db.commit()
@@ -65,7 +67,9 @@ def insert_preference(ranker: Ranker, preferred: Item, nonpreferred: Item):
 # Retrieve operations
 
 def get_direct_preferences(ranker: Ranker) -> list[tuple[Item, Item]]:
-    query = f"MATCH (i:Item)-[:PREFERRED_TO_BY {{by:'{ranker.ranker_id}'}}]->(j:Item) RETURN i,j"
+    query = "MATCH (i:Item)-[r:PREFERRED_TO_BY]->(j:Item) " 
+    query += f"WHERE r.by= '{ranker.ranker_id}'" 
+    query += "RETURN i,j"
 
     results, _ = db.cypher_query(query)
     return [(Item.inflate(row[0]), Item.inflate(row[1])) for row in results]
@@ -79,9 +83,9 @@ def delete_direct_preference(ranker: Ranker, preferred: Item, nonpreferred: Item
         if not direct_preference_exists:
             return 'Invalid'
 
-        query = f"MATCH (i:Item)-[r:PREFERRED_TO_BY {{by:'{ranker.ranker_id}'}}]->(j:Item) "
-        query += f"WHERE i.item_id='{preferred.item_id}', j.item_id='{nonpreferred.item_id}' "
-        query += f" DELETE r"
+        query = "MATCH (i:Item)-[r:PREFERRED_TO_BY]->(j:Item) "
+        query += f"WHERE i.item_id='{preferred.item_id}', j.item_id='{nonpreferred.item_id}', r.by='{ranker.ranker_id}'"
+        query += " DELETE r"
 
         db.cypher_query(query)
 
@@ -94,15 +98,16 @@ def delete_ranker_knows(ranker:Ranker, item:Item):
     db.begin()
     try:
         # Delete all direct preferences the ranker has for this item in both directions
-        del_preference_query = f"MATCH (i:Item)-[r:PREFERRED_TO_BY {{by:'{ranker.ranker_id}'}}]-(:Item) "
-        del_preference_query += f"WHERE i.item_id='{item.item_id}' "
-        del_preference_query += f"DELETE r"
+        del_preference_query = "MATCH (i:Item)-[r:PREFERRED_TO_BY]-(:Item) "
+        del_preference_query += f"WHERE i.item_id='{item.item_id}', r.by='{ranker.ranker_id}'"
+        del_preference_query += "DELETE r"
 
         db.cypher_query(del_preference_query)
 
         # Then delete this KNOWS relationship
-        del_knows_query = f"MATCH (x:Ranker {{ranker_id = '{ranker.ranker_id}'}})-[r:KNOWS]->(i:Item {{item_id='{item.item_id}'}}) "
-        del_knows_query = f"DELETE r"
+        del_knows_query = f"MATCH (x:Ranker)-[r:KNOWS]->(i:Item) "
+        del_knows_query += f"WHERE x.ranker_id='{ranker.ranker_id}', i.item_id='{item.item_id}' "
+        del_knows_query += f"DELETE r"
         db.cypher_query(del_knows_query)
 
         db.commit()
@@ -114,17 +119,19 @@ def delete_ranker(ranker:Ranker):
     db.begin()
     try:
         # Delete all preferences the ranker has for all items in both directions
-        del_preference_query = f"MATCH (:Item)-[r:PREFERRED_TO_BY {{by:'{ranker.ranker_id}'}}]-(:Item) "
+        del_preference_query = f"MATCH (:Item)-[r:PREFERRED_TO_BY]-(:Item) "
+        del_preference_query += f"WHERE r.by = '{ranker.ranker_id}' "
         del_preference_query += f"DELETE r"
         db.cypher_query(del_preference_query)
 
         # Delete all KNOWS relationships the ranker has for all items
-        del_knows_query = f"MATCH (x:Ranker {{ranker_id = '{ranker.ranker_id}'}})-[r:KNOWS]->(:Item) "
-        del_knows_query = f"DELETE r"
+        del_knows_query = f"MATCH (x:Ranker)-[r:KNOWS]->(:Item) "
+        del_knows_query += f"WHERE x.ranker_id = '{ranker.ranker_id}' "
+        del_knows_query += f"DELETE r"
         db.cypher_query(del_knows_query)
 
         # Then delete the ranker
-        del_ranker_query = f"MATCH (x:Ranker {{ranker_id = '{ranker.ranker_id}'}}) DELETE x"
+        del_ranker_query = f"MATCH (x:Ranker) WHERE x.ranker_id='{ranker.ranker_id}' DELETE x"
         db.cypher_query(del_ranker_query)
 
         db.commit()
@@ -138,7 +145,8 @@ def delete_item(item:Item):
         # Detach item from other items (removing preferences for all rankers)
         # Detach item from rankers (removing known relationships)
         # Then delete item
-        del_preference_query = f"MATCH (i:Item {{item_id = '{item.item_id}'}}) "
+        del_preference_query = f"MATCH (i:Item) "
+        del_preference_query += f"WHERE i.item_id = '{item.item_id}'"
         del_preference_query += f"DETACH DELETE i"
         db.cypher_query(del_preference_query)
         db.commit()

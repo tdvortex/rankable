@@ -2,10 +2,10 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('preferences/items/', views.item_list),
-    path('preferences/<str:item_id>/', views.item_detail),
-    path('preferences/', views.ranker_list),
-    path('preferences/<str:ranker_id>/', views.ranker_detail),
-    path('preferences/<str:ranker_id>/<str:item_id>/', views.ranker_knows),
-    path('preferences/<str:ranker_id>/<str:preferred_id>/<str:nonpreferred_id>/', views.ranker_pairwise_preference)
+    path('items/', views.item_list),
+    path('items/<str:item_id>/', views.item_detail),
+    path('ranker/', views.ranker_list),
+    path('ranker/<str:ranker_id>/', views.ranker_detail),
+    path('ranker/<str:ranker_id>/<str:item_id>/', views.ranker_knows),
+    path('ranker/<str:ranker_id>/<str:preferred_id>/<str:nonpreferred_id>/', views.ranker_pairwise_preference)
 ]

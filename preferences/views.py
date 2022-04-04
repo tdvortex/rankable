@@ -70,7 +70,7 @@ def ranker_detail(request, ranker_id: str):
                            for i, j in get_direct_preferences(ranker)]
 
         # Combine into a single JSON object
-        data = json.dumps({'ranker': ranker_data, 'preferences': preference_data})
+        data = {'ranker': ranker_data, 'preferences': preference_data}
         return Response(data=data, status=status.HTTP_200_OK)
     elif request.method == 'DELETE':
         delete_ranker(ranker)
@@ -143,8 +143,8 @@ def ranker_pairwise_preference(request, ranker_id: str, preferred_id: str, nonpr
 
         # If it does, return a JSON of the two serialized items in order of preference
         return Response(
-            data=json.dumps([ItemSerializer(preferred).data,
-                            ItemSerializer(nonpreferred).data]),
+            data=[ItemSerializer(preferred).data,
+                            ItemSerializer(nonpreferred).data],
             status=status.HTTP_200_OK
         )
     elif request.method == 'POST':
@@ -159,14 +159,12 @@ def ranker_pairwise_preference(request, ranker_id: str, preferred_id: str, nonpr
             )
         elif result == 'Exists':
             return Response(
-                data=json.dumps([ItemSerializer(preferred).data,
-                                ItemSerializer(nonpreferred).data]),
+                data=[ItemSerializer(preferred).data, ItemSerializer(nonpreferred).data],
                 status=status.HTTP_200_OK
             )
         elif result == 'Created':
             return Response(
-                data=json.dumps([ItemSerializer(preferred).data,
-                                ItemSerializer(nonpreferred).data]),
+                data=[ItemSerializer(preferred).data, ItemSerializer(nonpreferred).data],
                 status=status.HTTP_201_CREATED
             )
     elif request.method == 'DELETE':
