@@ -9,12 +9,13 @@ from .cypher import (delete_direct_preference, delete_item, delete_ranker, delet
 from .serializers import RankerSerializer, ItemSerializer
 
 
-@api_view(['GET'])
+@api_view(['GET', 'HEAD'])
 def item_list(request):
-    if request.method == 'GET':
+    if request.method == 'GET' or request.method == 'HEAD':
         # Get a list of all items
         serializer = ItemSerializer(Item.nodes.all(), many=True)
-        return Response(data=serializer.data, status=status.HTTP_200_OK)
+        data = serializer.data if request.method == 'GET' else []
+        return Response(data=data, status=status.HTTP_200_OK)
     elif request.method == 'POST':
         # Create a new item
         serializer = ItemSerializer(data=request.data)
@@ -24,26 +25,28 @@ def item_list(request):
         else:
             return Response(data={'validation_error': 'Invalid data'}, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['GET', 'DELETE'])
+@api_view(['GET', 'HEAD', 'DELETE'])
 def item_detail(request, item_id:str):
     # Check if item exists
     item = Item.nodes.first_or_none(item_id=item_id)
     if not item:
         return Response(status=status.HTTP_404_NOT_FOUND, data={'error': f'Item with id {item_id} not found'})
 
-    if request.method == 'GET':
+    if request.method == 'GET' or request.method == 'HEAD':
         serializer = ItemSerializer(item)
-        return Response(data=serializer.data, status=status.HTTP_200_OK)
+        data = serializer.data if request.method == 'GET' else []
+        return Response(data=data, status=status.HTTP_200_OK)
     elif request.method == 'DELETE':
         delete_item(item)
         return Response(status=status.HTTP_204_NO_CONTENT) 
 
-@api_view(['GET', 'POST'])
+@api_view(['GET', 'HEAD', 'POST'])
 def ranker_list(request):
-    if request.method == 'GET':
+    if request.method == 'GET' or request.method == 'HEAD':
         # Get a list of all rankers
         serializer = RankerSerializer(Ranker.nodes.all(), many=True)
-        return Response(data=serializer.data, status=status.HTTP_200_OK)
+        data = serializer.data if request.method == 'GET' else []
+        return Response(data=data, status=status.HTTP_200_OK)
     elif request.method == 'POST':
         # Create a new ranker
         serializer = RankerSerializer(data=request.data)
@@ -54,14 +57,14 @@ def ranker_list(request):
             return Response(data={'validation_error': 'Invalid data'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['GET', 'DELETE'])
+@api_view(['GET', 'HEAD', 'DELETE'])
 def ranker_detail(request, ranker_id: str):
     # Check if ranker exists
     ranker = Ranker.nodes.first_or_none(ranker_id=ranker_id)
     if not ranker:
         return Response(status=status.HTTP_404_NOT_FOUND, data={'error': f'Ranker with id {ranker_id} not found'})
 
-    if request.method == 'GET':
+    if request.method == 'GET' or request.method == 'HEAD':
         # Get the serialized info for this ranker
         ranker_data = RankerSerializer(ranker).data
         
@@ -71,13 +74,18 @@ def ranker_detail(request, ranker_id: str):
 
         # Combine into a single JSON object
         data = {'ranker': ranker_data, 'preferences': preference_data}
+
+        # Don't actually return the data for HEAD though
+        if request.method == 'HEAD':
+            data = {}
+
         return Response(data=data, status=status.HTTP_200_OK)
     elif request.method == 'DELETE':
         delete_ranker(ranker)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-@api_view(['GET', 'POST', 'DELETE'])
+@api_view(['GET', 'HEAD', 'POST', 'DELETE'])
 def ranker_knows(request, ranker_id: str, item_id: str):
     errors = {}
 
@@ -93,15 +101,16 @@ def ranker_knows(request, ranker_id: str, item_id: str):
     if errors:
         return Response(status=status.HTTP_404_NOT_FOUND, data=errors)
 
-    if request.method == 'GET':
+    if request.method == 'GET' or request.method == 'HEAD':
         # Check if the ranker knows the item
         if not ranker_knows_item:
             # If they don't, return 204
             return Response(status=status.HTTP_204_NO_CONTENT)
 
-        # Otherwise return the serialized item
+        # Otherwise return the serialized item on a GET request
         serializer = ItemSerializer(item)
-        return Response(data=serializer.data, status=status.HTTP_200_OK)
+        data = serializer.data if request.method == 'GET' else []
+        return Response(data=data, status=status.HTTP_200_OK)
     elif request.method == 'POST':
         # Create the relationship if you need to
         result = insert_ranker_knows(ranker, item)
@@ -116,7 +125,7 @@ def ranker_knows(request, ranker_id: str, item_id: str):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-@api_view(['GET', 'POST', 'DELETE'])
+@api_view(['GET', 'HEAD', 'POST', 'DELETE'])
 def ranker_pairwise_preference(request, ranker_id: str, preferred_id: str, nonpreferred_id: str):
     errors = {}
 
@@ -135,18 +144,19 @@ def ranker_pairwise_preference(request, ranker_id: str, preferred_id: str, nonpr
     if errors:
         return Response(status=status.HTTP_404_NOT_FOUND, data=errors)
 
-    if request.method == 'GET':
+    if request.method == 'GET' or request.method == 'HEAD':
         # Check if the requested preference exists
         if not direct_preference_exists(ranker, preferred, nonpreferred):
             # If it doesn't, return 204
             return Response(status=status.HTTP_204_NO_CONTENT)
 
-        # If it does, return a JSON of the two serialized items in order of preference
-        return Response(
-            data=[ItemSerializer(preferred).data,
-                            ItemSerializer(nonpreferred).data],
-            status=status.HTTP_200_OK
-        )
+        # If it does, return a JSON of the two serialized items in order of preference if GET
+        # Or just 200 on a HEAD
+        if request.method == 'GET':
+            data = [ItemSerializer(preferred).data, ItemSerializer(nonpreferred).data]
+        else:
+            data = []
+        return Response(data=data,status=status.HTTP_200_OK)
     elif request.method == 'POST':
         # Try to insert the preference, see if it works
         result = insert_preference(ranker, preferred, nonpreferred)
