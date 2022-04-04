@@ -26,7 +26,7 @@ def items(request):
 
 
 @api_view(['GET', 'POST'])
-def rankers(request):
+def ranker_list(request):
     if request.method == 'GET':
         # Get a list of all rankers
         serializer = RankerSerializer(Ranker.nodes.all(), many=True)
@@ -41,17 +41,20 @@ def rankers(request):
             return Response(data={'validation_error': 'Invalid data'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['GET'])
-def ranker_preferences(request, ranker_id: str):
-    # Get a list of all preferences for this ranker
+@api_view(['GET', 'DELETE'])
+def ranker_detail(request, ranker_id: str):
+    # Check if ranker exists
     ranker = Ranker.nodes.first_or_none(ranker_id=ranker_id)
     if not ranker:
         return Response(status=status.HTTP_404_NOT_FOUND, data={'error': f'Ranker with id {ranker_id} not found'})
 
-    data = json.dumps([[ItemSerializer(i).data, ItemSerializer(j).data]
-                      for i, j in get_direct_preferences(ranker)])
-    return Response(data=data, status=status.HTTP_200_OK)
-
+    if request.method == 'GET':
+        # Get a list of all preferences for this ranker
+        data = json.dumps([[ItemSerializer(i).data, ItemSerializer(j).data]
+                        for i, j in get_direct_preferences(ranker)])
+        return Response(data=data, status=status.HTTP_200_OK)
+    elif request.method == 'DELETE':
+        
 
 @api_view(['GET', 'POST', 'DELETE'])
 def ranker_knows(request, ranker_id: str, item_id: str):
