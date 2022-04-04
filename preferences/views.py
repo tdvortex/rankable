@@ -10,7 +10,7 @@ from .serializers import RankerSerializer, ItemSerializer
 
 
 @api_view(['GET'])
-def items(request):
+def item_list(request):
     if request.method == 'GET':
         # Get a list of all items
         serializer = ItemSerializer(Item.nodes.all(), many=True)
@@ -24,6 +24,16 @@ def items(request):
         else:
             return Response(data={'validation_error': 'Invalid data'}, status=status.HTTP_400_BAD_REQUEST)
 
+@api_view(['GET'])
+def item_detail(request, item_id:str):
+    # Check if item exists
+    item = Item.nodes.first_or_none(item_id=item_id)
+    if not item:
+        return Response(status=status.HTTP_404_NOT_FOUND, data={'error': f'Item with id {item_id} not found'})
+
+    if request.method == 'GET':
+        serializer = ItemSerializer(item)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
 
 @api_view(['GET', 'POST'])
 def ranker_list(request):
@@ -49,9 +59,15 @@ def ranker_detail(request, ranker_id: str):
         return Response(status=status.HTTP_404_NOT_FOUND, data={'error': f'Ranker with id {ranker_id} not found'})
 
     if request.method == 'GET':
-        # Get a list of all preferences for this ranker
-        data = json.dumps([[ItemSerializer(i).data, ItemSerializer(j).data]
-                           for i, j in get_direct_preferences(ranker)])
+        # Get the serialized info for this ranker
+        ranker_data = RankerSerializer(ranker).data
+        
+        # Get the serialized infor for this ranker's preferences
+        preference_data = [[ItemSerializer(i).data, ItemSerializer(j).data]
+                           for i, j in get_direct_preferences(ranker)]
+
+        # Combine into a single JSON object
+        data = json.dumps({'ranker': ranker_data, 'preferences': preference_data})
         return Response(data=data, status=status.HTTP_200_OK)
     elif request.method == 'DELETE':
         delete_ranker(ranker)
