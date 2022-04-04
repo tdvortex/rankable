@@ -11,7 +11,7 @@ def ranker_knows_item(ranker: Ranker, item: Item) -> bool:
 
 
 def insert_ranker_knows(ranker: Ranker, item: Item):
-    query = f"MERGE (x:Ranker {{ranker_id = '{ranker.ranker_id}'}})-[:KNOWS]->(i:Item {{item_id=='{item.item_id}'}}) "
+    query = f"MERGE (x:Ranker {{ranker_id = '{ranker.ranker_id}'}})-[:KNOWS]->(i:Item {{item_id='{item.item_id}'}}) "
     query += f"ON MATCH RETURN 'Exists' "
     query += f"ON CREATE RETURN 'Created'"
 
@@ -70,3 +70,15 @@ def delete_direct_preference(ranker: Ranker, preferred: Item, nonpreferred: Item
 
     db.cypher_query(query)
     return True
+
+def delete_ranker_knows(ranker:Ranker, item:Item):
+    # Delete all preferences the ranker has for this item in both directions
+    del_preference_query = f"MATCH (i:Item)-[r:PREFERRED_TO_BY {{by:'{ranker.ranker_id}'}}]-(:Item) "
+    del_preference_query += f"WHERE i.item_id='{item.item_id}' "
+    del_preference_query += f"DELETE r"
+
+    db.cypher_query(del_preference_query)
+
+    # Then delete this KNOWS relationship
+    del_knows_query = f"MATCH (x:Ranker {{ranker_id = '{ranker.ranker_id}'}})-[r:KNOWS]->(i:Item {{item_id='{item.item_id}'}}) "
+    del_knows_query = f"DELETE r"

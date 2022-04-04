@@ -4,7 +4,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from .models import Ranker, Item
-from .cypher import (get_direct_preferences, direct_preference_exists, insert_preference,
+from .cypher import (delete_ranker_knows, get_direct_preferences, direct_preference_exists, insert_preference,
                      ranker_knows_item, insert_ranker_knows, delete_direct_preference)
 from .serializers import RankerSerializer, ItemSerializer
 
@@ -53,7 +53,7 @@ def ranker_preferences(request, ranker_id: str):
     return Response(data=data, status=status.HTTP_200_OK)
 
 
-@api_view(['GET', 'POST'])
+@api_view(['GET', 'POST', 'DELETE'])
 def ranker_knows(request, ranker_id: str, item_id: str):
     errors = {}
 
@@ -79,6 +79,7 @@ def ranker_knows(request, ranker_id: str, item_id: str):
         serializer = ItemSerializer(item)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
     elif request.method == 'POST':
+        # Create the relationship if you need to
         result = insert_ranker_knows(ranker, item)
         serializer = ItemSerializer(item)
 
@@ -86,9 +87,12 @@ def ranker_knows(request, ranker_id: str, item_id: str):
             return Response(data=serializer.data, status=status.HTTP_200_OK)
         elif result == 'Created':
             return Response(data=serializer.data, status=status.HTTP_201_CREATED)
+    elif request.method == 'DELETE':
+        delete_ranker_knows(ranker, item)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-@api_view(['GET', 'POST'])
+@api_view(['GET', 'POST', 'DELETE'])
 def ranker_pairwise_preference(request, ranker_id: str, preferred_id: str, nonpreferred_id: str):
     errors = {}
 
