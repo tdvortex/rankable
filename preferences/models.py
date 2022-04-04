@@ -1,8 +1,12 @@
-from neomodel import StructuredNode, StructuredRel, StringProperty, RelationshipTo
-from neomodel.cardinality import One
-class Item(StructuredNode):
+from django_neomodel import DjangoNode
+from neomodel import StringProperty
+
+
+class Item(DjangoNode):
     '''Profile for a an item which rankes prefer over other items'''
     item_id = StringProperty(required=True, unique_index=True)
-class Ranker(StructuredNode):
+
+
+class Ranker(DjangoNode):
     '''Profile for a user who provides rankings for items'''
     ranker_id = StringProperty(required=True, unique_index=True)
