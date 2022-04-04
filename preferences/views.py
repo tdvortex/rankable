@@ -9,7 +9,7 @@ from .cypher import (delete_direct_preference, delete_item, delete_ranker, delet
 from .serializers import RankerSerializer, ItemSerializer
 
 
-@api_view(['GET', 'HEAD'])
+@api_view(['GET', 'HEAD', 'POST'])
 def item_list(request):
     if request.method == 'GET' or request.method == 'HEAD':
         # Get a list of all items
@@ -103,7 +103,7 @@ def ranker_knows(request, ranker_id: str, item_id: str):
 
     if request.method == 'GET' or request.method == 'HEAD':
         # Check if the ranker knows the item
-        if not ranker_knows_item:
+        if not ranker_knows_item(ranker, item):
             # If they don't, return 204
             return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -112,14 +112,14 @@ def ranker_knows(request, ranker_id: str, item_id: str):
         data = serializer.data if request.method == 'GET' else []
         return Response(data=data, status=status.HTTP_200_OK)
     elif request.method == 'POST':
-        # Create the relationship if you need to
-        result = insert_ranker_knows(ranker, item)
-        serializer = ItemSerializer(item)
+        # Check if we need to create relationship
+        if ranker_knows_item(ranker, item):
+            return Response(data=[], status=status.HTTP_200_OK)
 
-        if result == 'Exists':
-            return Response(data=serializer.data, status=status.HTTP_200_OK)
-        elif result == 'Created':
-            return Response(data=serializer.data, status=status.HTTP_201_CREATED)
+        # Create the relationship
+        insert_ranker_knows(ranker, item)
+        serializer = ItemSerializer(item)
+        return Response(data=serializer.data, status=status.HTTP_201_CREATED)
     elif request.method == 'DELETE':
         delete_ranker_knows(ranker, item)
         return Response(status=status.HTTP_204_NO_CONTENT)
