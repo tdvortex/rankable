@@ -8,22 +8,6 @@ from .cypher import get_direct_preferences, direct_preference_exists, insert_pre
 from .serializers import RankerSerializer, ItemSerializer
 
 
-@api_view(['GET', 'POST'])
-def rankers(request):
-    if request.method == 'GET':
-        # Get a list of all rankers
-        serializer = RankerSerializer(Ranker.nodes.all(), many=True)
-        return Response(data=serializer.data, status=status.HTTP_200_OK)
-    elif request.method == 'POST':
-        # Create a new ranker
-        serializer = RankerSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(data=serializer.data, status=status.HTTP_201_CREATED)
-        else:
-            return Response(data={'validation_error': 'Invalid data'}, status=status.HTTP_400_BAD_REQUEST)
-
-
 @api_view(['GET'])
 def items(request):
     if request.method == 'GET':
@@ -33,6 +17,22 @@ def items(request):
     elif request.method == 'POST':
         # Create a new item
         serializer = ItemSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(data=serializer.data, status=status.HTTP_201_CREATED)
+        else:
+            return Response(data={'validation_error': 'Invalid data'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'POST'])
+def rankers(request):
+    if request.method == 'GET':
+        # Get a list of all rankers
+        serializer = RankerSerializer(Ranker.nodes.all(), many=True)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
+    elif request.method == 'POST':
+        # Create a new ranker
+        serializer = RankerSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(data=serializer.data, status=status.HTTP_201_CREATED)
@@ -53,6 +53,41 @@ def ranker_preferences(request, ranker_id: str):
 
 
 @api_view(['GET', 'POST'])
+def ranker_knows(request, ranker_id: str, item_id: str):
+    errors = {}
+
+    # Check for existence of ranker and item
+    ranker = Ranker.nodes.first_or_none(ranker_id=ranker_id)
+    item = Item.nodes.first_or_none(item_id=item_id)
+    if not ranker:
+        errors['ranker_error'] = f'Ranker with id {ranker_id} not found'
+    if not item:
+        errors['item_error'] = f'Item with id {item_id} not found'
+
+    # Throw 404 if anything is missing
+    if errors:
+        return Response(status=status.HTTP_404_NOT_FOUND, data=errors)
+
+    if request.method == 'GET':
+        # Check if the ranker knows the item
+        if not ranker_knows_item:
+            # If they don't, return 204
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        # Otherwise return the serialized item
+        serializer = ItemSerializer(item)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
+    elif request.method == 'POST':
+        result = insert_ranker_knows(ranker, item)
+        serializer = ItemSerializer(item)
+
+        if result == 'Exists':
+            return Response(data=serializer.data, status=status.HTTP_200_OK)
+        elif result == 'Created':
+            return Response(data=serializer.data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET', 'POST'])
 def ranker_pairwise_preference(request, ranker_id: str, preferred_id: str, nonpreferred_id: str):
     errors = {}
 
@@ -60,9 +95,12 @@ def ranker_pairwise_preference(request, ranker_id: str, preferred_id: str, nonpr
     ranker = Ranker.nodes.first_or_none(ranker_id=ranker_id)
     preferred = Item.nodes.first_or_none(item_id=preferred_id)
     nonpreferred = Item.nodes.first_or_none(item_id=nonpreferred_id)
-    if not ranker: errors['ranker_error'] = f'Ranker with id {ranker_id} not found'
-    if not preferred: errors['preferred_error'] = f'Item with id {preferred_id} not found'
-    if not nonpreferred: errors['nonpreferred_error'] = f'Item with id {nonpreferred_id} not found'
+    if not ranker:
+        errors['ranker_error'] = f'Ranker with id {ranker_id} not found'
+    if not preferred:
+        errors['preferred_error'] = f'Item with id {preferred_id} not found'
+    if not nonpreferred:
+        errors['nonpreferred_error'] = f'Item with id {nonpreferred_id} not found'
 
     # Throw 404 if anything is missing
     if errors:
@@ -76,7 +114,8 @@ def ranker_pairwise_preference(request, ranker_id: str, preferred_id: str, nonpr
 
         # If it does, return a JSON of the two serialized items in order of preference
         return Response(
-            data=json.dumps([ItemSerializer(preferred).data,ItemSerializer(nonpreferred).data]),
+            data=json.dumps([ItemSerializer(preferred).data,
+                            ItemSerializer(nonpreferred).data]),
             status=status.HTTP_200_OK
         )
     elif request.method == 'POST':
@@ -86,48 +125,18 @@ def ranker_pairwise_preference(request, ranker_id: str, preferred_id: str, nonpr
         # Return the appropriate response code
         if result == 'Invalid':
             return Response(
-                status=status.HTTP_400_BAD_REQUEST, 
+                status=status.HTTP_400_BAD_REQUEST,
                 data={'cycle_error': f'Ranker {ranker_id} has a preference for {nonpreferred_id} over {preferred_id}, cycles not allowed'}
             )
         elif result == 'Exists':
             return Response(
-                data=json.dumps([ItemSerializer(preferred).data,ItemSerializer(nonpreferred).data]),
+                data=json.dumps([ItemSerializer(preferred).data,
+                                ItemSerializer(nonpreferred).data]),
                 status=status.HTTP_200_OK
             )
         elif result == 'Created':
             return Response(
-                data=json.dumps([ItemSerializer(preferred).data,ItemSerializer(nonpreferred).data]),
+                data=json.dumps([ItemSerializer(preferred).data,
+                                ItemSerializer(nonpreferred).data]),
                 status=status.HTTP_201_CREATED
             )
-
-@api_view(['GET', 'POST'])
-def ranker_knows(request, ranker_id: str, item_id:str):
-    errors = {}
-
-    # Check for existence of ranker and item
-    ranker = Ranker.nodes.first_or_none(ranker_id=ranker_id)
-    item = Item.nodes.first_or_none(item_id=item_id)
-    if not ranker: errors['ranker_error'] = f'Ranker with id {ranker_id} not found'
-    if not item: errors['item_error'] = f'Item with id {item_id} not found'
-
-    # Throw 404 if anything is missing
-    if errors:
-        return Response(status=status.HTTP_404_NOT_FOUND, data=errors)
-
-    if request.method == 'GET':
-        # Check if the ranker knows the item
-        if not ranker_knows_item:
-            # If they don't, return 204
-            return Response(status=status.HTTP_204_NO_CONTENT)
-    
-        # Otherwise return the serialized item
-        serializer = ItemSerializer(item)
-        return Response(data=serializer.data, status=status.HTTP_200_OK)
-    elif request.method == 'POST':
-        result = insert_ranker_knows(ranker, item)
-        serializer = ItemSerializer(item)
-
-        if result == 'Exists':
-            return Response(data=serializer.data,status=status.HTTP_200_OK)
-        elif result == 'Created':
-            return Response(data=serializer.data, status=status.HTTP_201_CREATED)
