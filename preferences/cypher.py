@@ -11,7 +11,7 @@ def ranker_knows_item(ranker: Ranker, item: Item) -> bool:
     return results[0][0]
 
 def direct_preference_exists(ranker: Ranker, preferred: Item, nonpreferred: Item):
-    query = "MATCH (i:Item)-[r:IS_PREFERRED_TO_BY]->(j:Item) "
+    query = "MATCH (i:Item)-[r:PREFERRED_TO_BY]->(j:Item) "
     query += f"WHERE i.item_id='{preferred.item_id}' AND j.item_id='{nonpreferred.item_id}' AND r.by='{ranker.ranker_id}' "
     query += "RETURN count(r)>0"
 
@@ -19,22 +19,18 @@ def direct_preference_exists(ranker: Ranker, preferred: Item, nonpreferred: Item
     return results[0][0]
 
 def is_valid_preference(ranker: Ranker, preferred: Item, nonpreferred: Item) -> bool:
-    db.begin('READ')
-    try:
-        if not ranker_knows_item(ranker, preferred) or not ranker_knows_item(ranker, nonpreferred):
-            # Ranker must know both items to be have a preference
-            return False
+    if not ranker_knows_item(ranker, preferred) or not ranker_knows_item(ranker, nonpreferred):
+        # Ranker must know both items to be have a preference
+        return False
 
-        # Preference must not violate existing preferences and create a cycle
-        cyclic_query = "RETURN NOT exists((j:Item)-[r:PREFERRED_TO_BY*]->(i:Item) "
-        cyclic_query += f"WHERE i.item_id='{preferred.item_id}' AND j.item_id='{nonpreferred.item_id}', r.by='{ranker.ranker_id}'"
+    # Preference must not violate existing preferences and create a cycle
+    cyclic_query = "MATCH p=(j:Item)-[r:PREFERRED_TO_BY*]->(i:Item) "
+    cyclic_query += f"WHERE i.item_id='{preferred.item_id}' AND j.item_id='{nonpreferred.item_id}' "
+    cyclic_query += f"AND all(r in relationships(p) WHERE r.by='{ranker.ranker_id}') "
+    cyclic_query += "RETURN count(p)=0"
 
-        results, _ = db.cypher_query(cyclic_query)
-        db.commit()
-        return results[0][0]
-    except Exception as e:
-        db.rollback()
-        raise e
+    results, _ = db.cypher_query(cyclic_query)
+    return results[0][0]
 
 # Create operations
 
@@ -56,7 +52,6 @@ def insert_preference(ranker: Ranker, preferred: Item, nonpreferred: Item):
     query += f"MERGE (i)-[:PREFERRED_TO_BY {{by:'{ranker.ranker_id}'}}]->(j) "
 
     db.cypher_query(query)
-    db.commit()
     return 'Created'
 
 # Retrieve operations
