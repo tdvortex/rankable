@@ -2,6 +2,7 @@ from django.shortcuts import render
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
+from neomodel.exceptions import ConstraintValidationFailed
 from .models import Ranker, Item
 from .cypher import (delete_direct_preference, delete_item, delete_ranker, delete_ranker_knows, direct_preference_exists,
                      get_direct_preferences, insert_preference, insert_ranker_knows, ranker_knows_item)
@@ -18,10 +19,13 @@ def item_list(request):
     elif request.method == 'POST':
         # Create a new item
         serializer = ItemSerializer(data=request.data)
-        if serializer.is_valid():
+        if not serializer.is_valid():
+            return Response(data={'validation_error': 'Invalid data'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
             serializer.save()
             return Response(data=serializer.data, status=status.HTTP_201_CREATED)
-        else:
+        except ConstraintValidationFailed:
             return Response(data={'validation_error': 'Invalid data'}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET', 'HEAD', 'DELETE'])
@@ -49,10 +53,13 @@ def ranker_list(request):
     elif request.method == 'POST':
         # Create a new ranker
         serializer = RankerSerializer(data=request.data)
-        if serializer.is_valid():
+        if not serializer.is_valid():
+            return Response(data={'validation_error': 'Invalid data'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
             serializer.save()
             return Response(data=serializer.data, status=status.HTTP_201_CREATED)
-        else:
+        except ConstraintValidationFailed:
             return Response(data={'validation_error': 'Invalid data'}, status=status.HTTP_400_BAD_REQUEST)
 
 
