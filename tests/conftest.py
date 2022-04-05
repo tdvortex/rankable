@@ -1,10 +1,11 @@
 import pytest
+from django.contrib.auth.hashers import make_password
 from rest_framework.test import APIClient
+from neomodel import db, clear_neo4j_database, install_all_labels
 from model_bakery import baker
 from users.models import User
 from movies.models import Movie
-from django.contrib.auth.hashers import make_password
-
+from preferences.models import Item, Ranker
 
 @pytest.fixture
 def api_client():
@@ -54,3 +55,56 @@ def authenticated_user_client(api_client, bake_user):
     user = bake_user()
     api_client.force_authenticate(user=user)
     return api_client
+
+
+@pytest.fixture
+def setup_neo4j_database():
+    clear_neo4j_database(db)
+    install_all_labels()
+    # Create three rankers with ids 123, 456, and 789
+    Ranker(ranker_id='123').save()
+    Ranker(ranker_id='456').save()
+    Ranker(ranker_id='789').save()
+
+    # Create six items with IDs A,B,C,D,E,F
+    Item(item_id='A').save()
+    Item(item_id='B').save()
+    Item(item_id='C').save()
+    Item(item_id='D').save()
+    Item(item_id='E').save()
+    Item(item_id='F').save()
+
+    # Ranker 123 knows and prefers A->B->E, A->C->E, A->D and does not know F
+    query = "MATCH (x:Ranker), (i:Item) "
+    query += "WHERE x.ranker_id='123' AND i.item_id IN ['A','B','C','D','E'] "
+    query += "MERGE (x)-[:KNOWS]->(i) "
+    db.cypher_query(query)
+
+    query = "MATCH (i:Item), (j:Item), (x:Ranker) "
+    query += "WHERE x.ranker_id = '123' AND "
+    query += "((i.item_id='A' AND j.item_id IN ['B','C']) OR"
+    query += "(i.item_id='B' AND j.item_id='E') OR "
+    query += "(i.item_id='C' AND j.item_id='E')) "
+    query += f"MERGE (i)-[:PREFERRED_TO_BY {{ranker_id:x.ranker_id}}]->(j) "
+    db.cypher_query(query)
+
+    # Ranker 456 knows and prefers F->E->D->C->B and does not know A
+    query = "MATCH (x:Ranker), (i:Item) "
+    query += "WHERE x.ranker_id='456' AND i.item_id IN ['B','C','D','E','F'] "
+    query += "MERGE (x)-[:KNOWS]->(i) "
+    db.cypher_query(query)
+
+    query = "MATCH (i:Item), (j:Item), (x:Ranker) "
+    query += "WHERE x.ranker_id = '456' AND "
+    query += "((i.item_id='F' AND j.item_id='E') OR"
+    query += "(i.item_id='E' AND j.item_id='D') OR "
+    query += "(i.item_id='D' AND j.item_id='C') OR "
+    query += "(i.item_id='C' AND j.item_id='B')) "
+    query += f"MERGE (i)-[:PREFERRED_TO_BY {{ranker_id:x.ranker_id}}]->(j) "
+    db.cypher_query(query)
+
+    # Ranker 789 knows A,C,E but has no known preferences between them, and does not know B,D,F
+    query = "MATCH (x:Ranker), (i:Item) "
+    query += "WHERE x.ranker_id='789' AND i.item_id IN ['A','C','E'] "
+    query += "MERGE (x)-[:KNOWS]->(i) "
+    db.cypher_query(query)

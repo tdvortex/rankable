@@ -1,4 +1,3 @@
-from cgi import test
 import pytest
 from rest_framework import status
 from movies.models import Movie
