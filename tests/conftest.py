@@ -85,7 +85,7 @@ def setup_neo4j_database():
     query += "((i.item_id='A' AND j.item_id IN ['B','C']) OR"
     query += "(i.item_id='B' AND j.item_id='E') OR "
     query += "(i.item_id='C' AND j.item_id='E')) "
-    query += f"MERGE (i)-[:PREFERRED_TO_BY {{ranker_id:x.ranker_id}}]->(j) "
+    query += f"MERGE (i)-[:PREFERRED_TO_BY {{by:x.ranker_id}}]->(j) "
     db.cypher_query(query)
 
     # Ranker 456 knows and prefers F->E->D->C->B and does not know A
@@ -100,7 +100,7 @@ def setup_neo4j_database():
     query += "(i.item_id='E' AND j.item_id='D') OR "
     query += "(i.item_id='D' AND j.item_id='C') OR "
     query += "(i.item_id='C' AND j.item_id='B')) "
-    query += f"MERGE (i)-[:PREFERRED_TO_BY {{ranker_id:x.ranker_id}}]->(j) "
+    query += f"MERGE (i)-[:PREFERRED_TO_BY {{by:x.ranker_id}}]->(j) "
     db.cypher_query(query)
 
     # Ranker 789 knows A,C,E but has no known preferences between them, and does not know B,D,F
