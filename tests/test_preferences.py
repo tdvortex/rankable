@@ -43,3 +43,25 @@ class TestItemDetail:
         response = api_client.delete('/api/preferences/items/A/')
 
         assert response.status_code == status.HTTP_204_NO_CONTENT
+
+class TestRankerList:
+    def test_get_returns_all_rankers_and_200(self, api_client, setup_neo4j_database):
+        response = api_client.get('/api/preferences/ranker/')
+
+        assert response.status_code == status.HTTP_200_OK
+        assert len(response.data) == 3
+
+    def test_if_post_creates_new_ranker_returns_201(self, api_client, setup_neo4j_database):
+        response = api_client.post('/api/preferences/ranker/', data={'ranker_id':'G'})
+
+        assert response.status_code == status.HTTP_201_CREATED
+
+    def test_if_post_bad_data_returns_400(self, api_client, setup_neo4j_database):
+        response = api_client.post('/api/preferences/ranker/', data={'garbage':'XXXXX'})
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_if_duplicate_ranker_returns_400(self, api_client, setup_neo4j_database):
+        response = api_client.post('/api/preferences/ranker/', data={'ranker_id':'123'})
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
