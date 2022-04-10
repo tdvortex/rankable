@@ -1,5 +1,5 @@
 from django_neomodel import DjangoNode
-from neomodel import StringProperty
+from neomodel import StringProperty, RelationshipTo
 
 
 class Item(DjangoNode):
@@ -11,5 +11,6 @@ class Item(DjangoNode):
 class Ranker(DjangoNode):
     '''Profile for a user who provides rankings for items'''
     ranker_id = StringProperty(required=True, unique_index=True, primary_key=True)
+    known_items = RelationshipTo('Item', 'KNOWS')
     class Meta:
         app_label = 'preferences'

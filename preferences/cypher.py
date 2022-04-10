@@ -3,12 +3,7 @@ from neomodel import db
 
 # Boolean checks
 def ranker_knows_item(ranker: Ranker, item: Item) -> bool:
-    query = "MATCH (x:Ranker)-[r:KNOWS]->(i:Item) "
-    query += f"WHERE x.ranker_id='{ranker.ranker_id}' AND i.item_id='{item.item_id}' "
-    query += "RETURN count(r)>0"
- 
-    results, _ = db.cypher_query(query)
-    return results[0][0]
+    return ranker.known_items.get_or_none(item_id=item.item_id) is not None
 
 def direct_preference_exists(ranker: Ranker, preferred: Item, nonpreferred: Item):
     query = "MATCH (i:Item)-[r:PREFERRED_TO_BY]->(j:Item) "
@@ -33,12 +28,8 @@ def is_valid_preference(ranker: Ranker, preferred: Item, nonpreferred: Item) -> 
     return results[0][0]
 
 # Create operations
-
 def insert_ranker_knows(ranker: Ranker, item: Item):
-    query = "MATCH (x:Ranker), (i:Item) "
-    query += f"WHERE x.ranker_id='{ranker.ranker_id}' AND i.item_id='{item.item_id}'"
-    query += f"MERGE (x)-[:KNOWS]->(i) "
-    db.cypher_query(query)
+    ranker.known_items.connect(item)
 
 def insert_preference(ranker: Ranker, preferred: Item, nonpreferred: Item):
     if not is_valid_preference(ranker, preferred, nonpreferred):
@@ -95,10 +86,7 @@ def delete_ranker_knows(ranker:Ranker, item:Item):
         db.cypher_query(del_preference_query)
 
         # Then delete this KNOWS relationship
-        del_knows_query = f"MATCH (x:Ranker)-[r:KNOWS]->(i:Item) "
-        del_knows_query += f"WHERE x.ranker_id='{ranker.ranker_id}' AND i.item_id='{item.item_id}' "
-        del_knows_query += f"DELETE r"
-        db.cypher_query(del_knows_query)
+        ranker.known_items.disconnect(item)
 
         db.commit()
     except Exception as e:
@@ -115,10 +103,7 @@ def delete_ranker(ranker:Ranker):
         db.cypher_query(del_preference_query)
 
         # Delete all KNOWS relationships the ranker has for all items
-        del_knows_query = f"MATCH (x:Ranker)-[r:KNOWS]->(:Item) "
-        del_knows_query += f"WHERE x.ranker_id = '{ranker.ranker_id}' "
-        del_knows_query += f"DELETE r"
-        db.cypher_query(del_knows_query)
+        ranker.known_items.disconnect_all()
 
         # Then delete the ranker
         del_ranker_query = f"MATCH (x:Ranker) WHERE x.ranker_id='{ranker.ranker_id}' DELETE x"

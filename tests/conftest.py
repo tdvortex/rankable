@@ -62,23 +62,24 @@ def setup_neo4j_database():
     clear_neo4j_database(db)
     install_all_labels()
     # Create three rankers with ids 123, 456, and 789
-    Ranker(ranker_id='123').save()
-    Ranker(ranker_id='456').save()
-    Ranker(ranker_id='789').save()
+    ranker_123 = Ranker(ranker_id='123').save()
+    ranker_456 = Ranker(ranker_id='456').save()
+    ranker_789 = Ranker(ranker_id='789').save()
 
     # Create six items with IDs A,B,C,D,E,F
-    Item(item_id='A').save()
-    Item(item_id='B').save()
-    Item(item_id='C').save()
-    Item(item_id='D').save()
-    Item(item_id='E').save()
-    Item(item_id='F').save()
+    item_a = Item(item_id='A').save()
+    item_b = Item(item_id='B').save()
+    item_c = Item(item_id='C').save()
+    item_d = Item(item_id='D').save()
+    item_e = Item(item_id='E').save()
+    item_f = Item(item_id='F').save()
 
     # Ranker 123 knows and prefers A->B->E, A->C->E, A->D and does not know F
-    query = "MATCH (x:Ranker), (i:Item) "
-    query += "WHERE x.ranker_id='123' AND i.item_id IN ['A','B','C','D','E'] "
-    query += "MERGE (x)-[:KNOWS]->(i) "
-    db.cypher_query(query)
+    ranker_123.known_items.connect(item_a)
+    ranker_123.known_items.connect(item_b)
+    ranker_123.known_items.connect(item_c)
+    ranker_123.known_items.connect(item_d)
+    ranker_123.known_items.connect(item_e)
 
     query = "MATCH (i:Item), (j:Item), (x:Ranker) "
     query += "WHERE x.ranker_id = '123' AND "
@@ -89,10 +90,12 @@ def setup_neo4j_database():
     db.cypher_query(query)
 
     # Ranker 456 knows and prefers F->E->D->C->B and does not know A
-    query = "MATCH (x:Ranker), (i:Item) "
-    query += "WHERE x.ranker_id='456' AND i.item_id IN ['B','C','D','E','F'] "
-    query += "MERGE (x)-[:KNOWS]->(i) "
-    db.cypher_query(query)
+    ranker_456.known_items.connect(item_b)
+    ranker_456.known_items.connect(item_b)
+    ranker_456.known_items.connect(item_c)
+    ranker_456.known_items.connect(item_d)
+    ranker_456.known_items.connect(item_e)
+    ranker_456.known_items.connect(item_f)
 
     query = "MATCH (i:Item), (j:Item), (x:Ranker) "
     query += "WHERE x.ranker_id = '456' AND "
@@ -104,7 +107,6 @@ def setup_neo4j_database():
     db.cypher_query(query)
 
     # Ranker 789 knows A,C,E but has no known preferences between them, and does not know B,D,F
-    query = "MATCH (x:Ranker), (i:Item) "
-    query += "WHERE x.ranker_id='789' AND i.item_id IN ['A','C','E'] "
-    query += "MERGE (x)-[:KNOWS]->(i) "
-    db.cypher_query(query)
+    ranker_789.known_items.connect(item_a)
+    ranker_789.known_items.connect(item_c)
+    ranker_789.known_items.connect(item_e)
