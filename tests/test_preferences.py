@@ -143,3 +143,86 @@ class TestRankerKnows:
         response = api_client.delete('/api/preferences/ranker/123/A/')
 
         assert response.status_code == status.HTTP_204_NO_CONTENT
+
+class TestRankerPairwiseGet:
+    def test_if_ranker_dne_get_returns_404(self, api_client, setup_neo4j_database):
+        response = api_client.get('/api/preferences/ranker/xxx/A/B/')
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+    
+    def test_if_preferred_dne_get_returns_404(self, api_client, setup_neo4j_database):
+        response = api_client.get('/api/preferences/ranker/123/X/B/')
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_if_nonpreferred_dne_get_returns_404(self, api_client, setup_neo4j_database):
+        response = api_client.get('/api/preferences/ranker/123/A/X/')
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_if_preference_exists_get_returns_200(self, api_client, setup_neo4j_database):
+        response = api_client.get('/api/preferences/ranker/123/A/B/')
+
+        assert response.status_code == status.HTTP_200_OK
+
+    def test_if_preference_dne_get_returns_204(self, api_client, setup_neo4j_database):
+        response = api_client.get('/api/preferences/ranker/123/A/E/')
+        
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
+class TestRankerPairwisePost:
+    def test_if_ranker_dne_post_returns_404(self, api_client, setup_neo4j_database):
+        response = api_client.post('/api/preferences/ranker/xxx/A/B/')
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+    
+    def test_if_preferred_dne_post_returns_404(self, api_client, setup_neo4j_database):
+        response = api_client.post('/api/preferences/ranker/123/X/B/')
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_if_nonpreferred_dne_post_returns_404(self, api_client, setup_neo4j_database):
+        response = api_client.post('/api/preferences/ranker/123/A/X/')
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_if_cyclic_preference_post_returns_400(self, api_client, setup_neo4j_database):
+        response = api_client.post('/api/preferences/ranker/123/E/A/')
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+    
+    def test_if_unknown_item_post_returns_400(self, api_client, setup_neo4j_database):
+        response = api_client.post('/api/preferences/ranker/123/A/F/')
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_if_existing_preference_post_returns_200(self, api_client, setup_neo4j_database):
+        response = api_client.post('/api/preferences/ranker/123/A/B/')
+
+        assert response.status_code == status.HTTP_200_OK
+
+    def test_if_valid_preference_post_returns_201(self, api_client, setup_neo4j_database):
+        response = api_client.post('/api/preferences/ranker/123/A/E/')
+
+        assert response.status_code == status.HTTP_201_CREATED
+
+class TestRankerPairwiseDelete:
+    def test_if_ranker_dne_delete_returns_404(self, api_client, setup_neo4j_database):
+        response = api_client.delete('/api/preferences/ranker/xxx/A/B/')
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+    
+    def test_if_preferred_dne_delete_returns_404(self, api_client, setup_neo4j_database):
+        response = api_client.delete('/api/preferences/ranker/123/X/B/')
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_if_nonpreferred_dne_delete_returns_404(self, api_client, setup_neo4j_database):
+        response = api_client.delete('/api/preferences/ranker/123/A/X/')
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_if_valid_delete_returns_204(self, api_client, setup_neo4j_database):
+        response = api_client.delete('/api/preferences/ranker/123/A/B/')
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
