@@ -6,12 +6,7 @@ def ranker_knows_item(ranker: Ranker, item: Item) -> bool:
     return ranker.known_items.get_or_none(item_id=item.item_id) is not None
 
 def direct_preference_exists(ranker: Ranker, preferred: Item, nonpreferred: Item):
-    query = "MATCH (i:Item)-[r:PREFERRED_TO_BY]->(j:Item) "
-    query += f"WHERE i.item_id='{preferred.item_id}' AND j.item_id='{nonpreferred.item_id}' AND r.by='{ranker.ranker_id}' "
-    query += "RETURN count(r)>0"
-
-    results, _ = db.cypher_query(query)
-    return results[0][0]
+    return nonpreferred in preferred.preferred_to_items.match(by=ranker.ranker_id)
 
 def is_valid_preference(ranker: Ranker, preferred: Item, nonpreferred: Item) -> bool:
     if not ranker_knows_item(ranker, preferred) or not ranker_knows_item(ranker, nonpreferred):
@@ -38,26 +33,20 @@ def insert_preference(ranker: Ranker, preferred: Item, nonpreferred: Item):
     if direct_preference_exists(ranker, preferred, nonpreferred):
         return 'Exists'
 
-    query = "MATCH (i:Item), (j:Item) "
-    query += f"WHERE i.item_id ='{preferred.item_id}' AND j.item_id ='{nonpreferred.item_id}' "
-    query += f"MERGE (i)-[:PREFERRED_TO_BY {{by:'{ranker.ranker_id}'}}]->(j) "
-
-    db.cypher_query(query)
+    preferred.preferred_to_items.connect(nonpreferred,
+                                         {'by': ranker.ranker_id})
     return 'Created'
 
 # Retrieve operations
-
 def get_direct_preferences(ranker: Ranker) -> list[tuple[Item, Item]]:
-    query = "MATCH (i:Item)-[r:PREFERRED_TO_BY]->(j:Item) " 
-    query += f"WHERE r.by='{ranker.ranker_id}'" 
+    query = "MATCH (i:Item)-[r:PREFERRED_TO_BY]->(j:Item) "
+    query += f"WHERE r.by='{ranker.ranker_id}'"
     query += "RETURN i,j"
 
     results, _ = db.cypher_query(query)
     return [(Item.inflate(row[0]), Item.inflate(row[1])) for row in results]
 
-
 # Delete operations
-
 def delete_direct_preference(ranker: Ranker, preferred: Item, nonpreferred: Item):
     db.begin()
     try:
@@ -65,17 +54,15 @@ def delete_direct_preference(ranker: Ranker, preferred: Item, nonpreferred: Item
             return 'Invalid'
 
         query = "MATCH (i:Item)-[r:PREFERRED_TO_BY]->(j:Item) "
-        query += f"WHERE i.item_id='{preferred.item_id}' AND j.item_id='{nonpreferred.item_id}' AND r.by='{ranker.ranker_id}'"
-        query += " DELETE r"
-
+        query += f"WHERE i.item_id='{preferred.item_id}' AND j.item_id='{nonpreferred.item_id}' AND r.by='{ranker.ranker_id}' "
+        query += "DELETE r"
         db.cypher_query(query)
-
         db.commit()
     except Exception as e:
         db.rollback()
         raise e
 
-def delete_ranker_knows(ranker:Ranker, item:Item):
+def delete_ranker_knows(ranker: Ranker, item: Item):
     db.begin()
     try:
         # Delete all direct preferences the ranker has for this item in both directions
@@ -93,7 +80,7 @@ def delete_ranker_knows(ranker:Ranker, item:Item):
         db.rollback()
         raise e
 
-def delete_ranker(ranker:Ranker):
+def delete_ranker(ranker: Ranker):
     db.begin()
     try:
         # Delete all preferences the ranker has for all items in both directions
@@ -106,15 +93,13 @@ def delete_ranker(ranker:Ranker):
         ranker.known_items.disconnect_all()
 
         # Then delete the ranker
-        del_ranker_query = f"MATCH (x:Ranker) WHERE x.ranker_id='{ranker.ranker_id}' DELETE x"
-        db.cypher_query(del_ranker_query)
-
+        ranker.delete()
         db.commit()
     except Exception as e:
         db.rollback()
         raise e
 
-def delete_item(item:Item):
+def delete_item(item: Item):
     db.begin()
     try:
         # Detach item from other items (removing preferences for all rankers)
