@@ -79,6 +79,11 @@ class RankerViewSet(ListModelMixin, NeomodelCreateModelMixin, RetrieveModelMixin
     def perform_destroy(self, instance):
         return delete_ranker(instance)
 
+    def get_sorted_list(self, request, *args, **kwargs):
+        ranker = self.get_object()
+        sorted_known_items = topological_sort(ranker)
+        serializer = ItemSerializer(sorted_known_items, many=True)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
 
 class RankerKnowsViewSet(GenericViewSet):
     def get_object(self):
@@ -115,7 +120,6 @@ class RankerKnowsViewSet(GenericViewSet):
         ranker, item = self.get_object()
         delete_ranker_knows(ranker, item)
         return Response(status=status.HTTP_204_NO_CONTENT)
-
 
 class RankerPairwiseViewSet(GenericViewSet):
     def get_object(self):
@@ -162,18 +166,3 @@ class RankerPairwiseViewSet(GenericViewSet):
         ranker, preferred, nonpreferred = self.get_object()
         delete_direct_preference(ranker, preferred, nonpreferred)
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-@api_view(['GET', 'HEAD'])
-def ranker_sort(request, ranker_id: str):
-    # Check for existence of ranker
-    ranker = Ranker.nodes.first_or_none(ranker_id=ranker_id)
-    if not ranker:
-        return Response(status=status.HTTP_404_NOT_FOUND,
-                        data={'ranker_error':
-                              f'Ranker with id {ranker_id} not found'})
-
-    sorted_known_items = topological_sort(ranker)
-    serializer = ItemSerializer(sorted_known_items, many=True)
-    data = serializer.data if request.method == 'GET' else []
-    return Response(data=data, status=status.HTTP_200_OK)
