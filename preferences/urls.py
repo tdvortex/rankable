@@ -2,8 +2,8 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('items/', views.item_list),
-    path('items/<str:item_id>/', views.item_detail),
+    path('items/', views.ItemViewSet.as_view({'get':'list', 'post':'create'})),
+    path('items/<str:item_id>/', views.ItemViewSet.as_view({'get':'retrieve', 'delete':'destroy'})),
     path('ranker/', views.ranker_list),
     path('ranker/<str:ranker_id>/', views.ranker_detail),
     path('ranker/<str:ranker_id>/knows/<str:item_id>/', views.ranker_knows),

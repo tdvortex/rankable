@@ -2,6 +2,7 @@ from django.shortcuts import render
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.viewsets import ViewSet
 from neomodel.exceptions import ConstraintValidationFailed
 from .models import Ranker, Item
 from .cypher import (delete_direct_preference, delete_item, delete_ranker, delete_ranker_knows, direct_preference_exists,
@@ -9,15 +10,13 @@ from .cypher import (delete_direct_preference, delete_item, delete_ranker, delet
 from .serializers import RankerSerializer, ItemSerializer
 
 
-@api_view(['GET', 'HEAD', 'POST'])
-def item_list(request):
-    if request.method == 'GET' or request.method == 'HEAD':
-        # Get a list of all items
-        serializer = ItemSerializer(Item.nodes.all(), many=True)
-        data = serializer.data if request.method == 'GET' else []
-        return Response(data=data, status=status.HTTP_200_OK)
-    elif request.method == 'POST':
-        # Create a new item
+class ItemViewSet(ViewSet):
+    def list(self, request):
+        queryset = Item.nodes.all()
+        serializer = ItemSerializer(queryset, many=True)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+    def create(self, request):
         serializer = ItemSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(data={'validation_error': 'Invalid data'}, status=status.HTTP_400_BAD_REQUEST)
@@ -27,20 +26,19 @@ def item_list(request):
             return Response(data=serializer.data, status=status.HTTP_201_CREATED)
         except ConstraintValidationFailed:
             return Response(data={'validation_error': 'Invalid data'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    def retrieve(self, request, item_id:str):
+        item = Item.nodes.first_or_none(item_id=item_id)
+        if not item:
+            return Response(status=status.HTTP_404_NOT_FOUND, data={'error': f'Item with id {item_id} not found'})
 
-
-@api_view(['GET', 'HEAD', 'DELETE'])
-def item_detail(request, item_id: str):
-    # Check if item exists
-    item = Item.nodes.first_or_none(item_id=item_id)
-    if not item:
-        return Response(status=status.HTTP_404_NOT_FOUND, data={'error': f'Item with id {item_id} not found'})
-
-    if request.method == 'GET' or request.method == 'HEAD':
         serializer = ItemSerializer(item)
-        data = serializer.data if request.method == 'GET' else []
-        return Response(data=data, status=status.HTTP_200_OK)
-    elif request.method == 'DELETE':
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+    def destroy(self, request, item_id:str):
+        item = Item.nodes.first_or_none(item_id=item_id)
+        if not item:
+            return Response(status=status.HTTP_404_NOT_FOUND, data={'error': f'Item with id {item_id} not found'})
         delete_item(item)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
