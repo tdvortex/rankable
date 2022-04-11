@@ -113,3 +113,11 @@ def delete_item(item: Item):
     except Exception as e:
         db.rollback()
         raise e
+
+def topological_sort(ranker: Ranker):
+    query = f"MATCH (:Ranker {{ranker_id:'{ranker.ranker_id}'}})-[:KNOWS]->(i:Item) "
+    query += "RETURN i "
+    query += f"ORDER BY size([(i:Item)-[:PREFERRED_TO_BY*{{by:'{ranker.ranker_id}'}}]->(j:Item) | j.item_id]) DESC"
+
+    results, _ = db.cypher_query(query)
+    return [Item.inflate(row[0]) for row in results]

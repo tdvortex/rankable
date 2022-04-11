@@ -63,8 +63,8 @@ def setup_neo4j_database():
     install_all_labels()
     # Create three rankers with ids 123, 456, and 789
     ranker_123 = Ranker(ranker_id='123').save()
-    ranker_456 = Ranker(ranker_id='456').save()
-    ranker_789 = Ranker(ranker_id='789').save()
+    # ranker_456 = Ranker(ranker_id='456').save()
+    # ranker_789 = Ranker(ranker_id='789').save()
 
     # Create six items with IDs A,B,C,D,E,F
     item_a = Item(item_id='A').save()
@@ -89,24 +89,24 @@ def setup_neo4j_database():
     query += f"MERGE (i)-[:PREFERRED_TO_BY {{by:x.ranker_id}}]->(j) "
     db.cypher_query(query)
 
-    # Ranker 456 knows and prefers F->E->D->C->B and does not know A
-    ranker_456.known_items.connect(item_b)
-    ranker_456.known_items.connect(item_b)
-    ranker_456.known_items.connect(item_c)
-    ranker_456.known_items.connect(item_d)
-    ranker_456.known_items.connect(item_e)
-    ranker_456.known_items.connect(item_f)
+    # # Ranker 456 knows and prefers F->E->D->C->B and does not know A
+    # ranker_456.known_items.connect(item_b)
+    # ranker_456.known_items.connect(item_b)
+    # ranker_456.known_items.connect(item_c)
+    # ranker_456.known_items.connect(item_d)
+    # ranker_456.known_items.connect(item_e)
+    # ranker_456.known_items.connect(item_f)
 
-    query = "MATCH (i:Item), (j:Item), (x:Ranker) "
-    query += "WHERE x.ranker_id = '456' AND "
-    query += "((i.item_id='F' AND j.item_id='E') OR"
-    query += "(i.item_id='E' AND j.item_id='D') OR "
-    query += "(i.item_id='D' AND j.item_id='C') OR "
-    query += "(i.item_id='C' AND j.item_id='B')) "
-    query += f"MERGE (i)-[:PREFERRED_TO_BY {{by:x.ranker_id}}]->(j) "
-    db.cypher_query(query)
+    # query = "MATCH (i:Item), (j:Item), (x:Ranker) "
+    # query += "WHERE x.ranker_id = '456' AND "
+    # query += "((i.item_id='F' AND j.item_id='E') OR"
+    # query += "(i.item_id='E' AND j.item_id='D') OR "
+    # query += "(i.item_id='D' AND j.item_id='C') OR "
+    # query += "(i.item_id='C' AND j.item_id='B')) "
+    # query += f"MERGE (i)-[:PREFERRED_TO_BY {{by:x.ranker_id}}]->(j) "
+    # db.cypher_query(query)
 
-    # Ranker 789 knows A,C,E but has no known preferences between them, and does not know B,D,F
-    ranker_789.known_items.connect(item_a)
-    ranker_789.known_items.connect(item_c)
-    ranker_789.known_items.connect(item_e)
+    # # Ranker 789 knows A,C,E but has no known preferences between them, and does not know B,D,F
+    # ranker_789.known_items.connect(item_a)
+    # ranker_789.known_items.connect(item_c)
+    # ranker_789.known_items.connect(item_e)
