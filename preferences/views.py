@@ -117,62 +117,49 @@ class RankerKnowsViewSet(GenericViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-@api_view(['GET', 'HEAD', 'POST', 'DELETE'])
-def ranker_pairwise_preference(request, ranker_id: str, preferred_id: str, nonpreferred_id: str):
-    errors = {}
+class RankerPairwiseViewSet(GenericViewSet):
+    def get_object(self):
+        try:
+            ranker = Ranker.nodes.get(ranker_id=self.kwargs['ranker_id'])
+            preferred = Item.nodes.get(item_id=self.kwargs['preferred_id'])
+            nonpreferred = Item.nodes.get(item_id=self.kwargs['nonpreferred_id'])
+        except DoesNotExist:
+            raise Http404
 
-    # Check for existence of ranker, preferred, and nonpreferred
-    ranker = Ranker.nodes.first_or_none(ranker_id=ranker_id)
-    preferred = Item.nodes.first_or_none(item_id=preferred_id)
-    nonpreferred = Item.nodes.first_or_none(item_id=nonpreferred_id)
-    if not ranker:
-        errors['ranker_error'] = f'Ranker with id {ranker_id} not found'
-    if not preferred:
-        errors['preferred_error'] = f'Item with id {preferred_id} not found'
-    if not nonpreferred:
-        errors['nonpreferred_error'] = f'Item with id {nonpreferred_id} not found'
+        self.check_object_permissions(self.request, ranker)
+        self.check_object_permissions(self.request, preferred)
+        self.check_object_permissions(self.request, nonpreferred)
 
-    # Throw 404 if anything is missing
-    if errors:
-        return Response(status=status.HTTP_404_NOT_FOUND, data=errors)
+        return ranker, preferred, nonpreferred
 
-    if request.method == 'GET' or request.method == 'HEAD':
-        # Check if the requested preference exists
-        if not direct_preference_exists(ranker, preferred, nonpreferred):
-            # If it doesn't, return 204
-            return Response(status=status.HTTP_204_NO_CONTENT)
-
-        # If it does, return a JSON of the two serialized items in order of preference if GET
-        # Or just 200 on a HEAD
-        if request.method == 'GET':
+    def retrieve(self, request, *args, **kwargs):
+        ranker, preferred, nonpreferred = self.get_object()
+        if direct_preference_exists(ranker, preferred, nonpreferred):
             data = [ItemSerializer(preferred).data,
                     ItemSerializer(nonpreferred).data]
+            return Response(data)
         else:
-            data = []
-        return Response(data=data, status=status.HTTP_200_OK)
-    elif request.method == 'POST':
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def create(self, request, *args, **kwargs):
+        ranker, preferred, nonpreferred = self.get_object()
+
         # Try to insert the preference, see if it works
         result = insert_preference(ranker, preferred, nonpreferred)
 
         # Return the appropriate response code
         if result == 'Invalid':
-            return Response(
-                status=status.HTTP_400_BAD_REQUEST,
-                data={'cycle_error': f'Ranker {ranker_id} has a preference for {nonpreferred_id} over {preferred_id}, cycles not allowed'}
-            )
-        elif result == 'Exists':
-            return Response(
-                data=[ItemSerializer(preferred).data,
-                      ItemSerializer(nonpreferred).data],
-                status=status.HTTP_200_OK
-            )
-        elif result == 'Created':
-            return Response(
-                data=[ItemSerializer(preferred).data,
-                      ItemSerializer(nonpreferred).data],
-                status=status.HTTP_201_CREATED
-            )
-    elif request.method == 'DELETE':
+            return Response(status=status.HTTP_400_BAD_REQUEST,)
+        else:
+            data = [ItemSerializer(preferred).data, ItemSerializer(nonpreferred).data]
+            
+            if result == 'Exists':
+                return Response(data, status=status.HTTP_200_OK)
+            else:
+                return Response(data, status=status.HTTP_201_CREATED)
+
+    def destroy(self, request, *args, **kwargs):
+        ranker, preferred, nonpreferred = self.get_object()
         delete_direct_preference(ranker, preferred, nonpreferred)
         return Response(status=status.HTTP_204_NO_CONTENT)
 

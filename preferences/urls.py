@@ -19,6 +19,8 @@ urlpatterns = [
                                            'post': 'create',
                                            'delete': 'destroy'})),
     path('ranker/<str:ranker_id>/prefers/<str:preferred_id>/<str:nonpreferred_id>/',
-         views.ranker_pairwise_preference),
+         views.RankerPairwiseViewSet.as_view({'get': 'retrieve',
+                                              'post': 'create',
+                                              'delete': 'destroy'})),
     path('ranker/<str:ranker_id>/sort/', views.ranker_sort)
 ]
