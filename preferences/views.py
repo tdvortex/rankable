@@ -54,53 +54,26 @@ class ItemViewSet(ListModelMixin, NeomodelCreateModelMixin, RetrieveModelMixin, 
     def perform_destroy(self, instance):
         return delete_item(instance)
 
-@api_view(['GET', 'HEAD', 'POST'])
-def ranker_list(request):
-    if request.method == 'GET' or request.method == 'HEAD':
-        # Get a list of all rankers
-        serializer = RankerSerializer(Ranker.nodes.all(), many=True)
-        data = serializer.data if request.method == 'GET' else []
-        return Response(data=data, status=status.HTTP_200_OK)
-    elif request.method == 'POST':
-        # Create a new ranker
-        serializer = RankerSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(data={'validation_error': 'Invalid data'}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            serializer.save()
-            return Response(data=serializer.data, status=status.HTTP_201_CREATED)
-        except ConstraintValidationFailed:
-            return Response(data={'validation_error': 'Invalid data'}, status=status.HTTP_400_BAD_REQUEST)
+class RankerViewSet(ListModelMixin, NeomodelCreateModelMixin, RetrieveModelMixin, DestroyModelMixin, NeomodelGenericViewSet):
+    queryset = Ranker.nodes
+    serializer_class = RankerSerializer
+    lookup_field = 'ranker_id'
 
+    def retrieve(self, request, *args, **kwargs):
+        ranker = self.get_object()
+        ranker_data = self.serializer_class(ranker).data
 
-@api_view(['GET', 'HEAD', 'DELETE'])
-def ranker_detail(request, ranker_id: str):
-    # Check if ranker exists
-    ranker = Ranker.nodes.first_or_none(ranker_id=ranker_id)
-    if not ranker:
-        return Response(status=status.HTTP_404_NOT_FOUND, data={'error': f'Ranker with id {ranker_id} not found'})
-
-    if request.method == 'GET' or request.method == 'HEAD':
-        # Get the serialized info for this ranker
-        ranker_data = RankerSerializer(ranker).data
-
-        # Get the serialized infor for this ranker's preferences
         preference_data = [[ItemSerializer(i).data, ItemSerializer(j).data]
                            for i, j in get_direct_preferences(ranker)]
 
         # Combine into a single JSON object
         data = {'ranker': ranker_data, 'preferences': preference_data}
 
-        # Don't actually return the data for HEAD though
-        if request.method == 'HEAD':
-            data = {}
+        return Response(data)
 
-        return Response(data=data, status=status.HTTP_200_OK)
-    elif request.method == 'DELETE':
-        delete_ranker(ranker)
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
+    def perform_destroy(self, instance):
+        return delete_ranker(instance)
 
 @api_view(['GET', 'HEAD', 'POST', 'DELETE'])
 def ranker_knows(request, ranker_id: str, item_id: str):

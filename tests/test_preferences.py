@@ -54,7 +54,6 @@ class TestRankerList:
         response = api_client.get('/api/preferences/ranker/')
 
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data) == 1
 
     def test_if_post_creates_new_ranker_returns_201(self, api_client, setup_neo4j_database):
         response = api_client.post(
