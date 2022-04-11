@@ -13,7 +13,8 @@ from .serializers import RankerSerializer, ItemSerializer
 
 
 class NeomodelGenericViewSet(GenericViewSet):
-    '''Overrides GenericViewSet to use neomodel configuration'''
+    '''Overrides GenericViewSet to use neomodel queryset construction'''
+
     def get_queryset(self):
         return self.queryset.all()
 
@@ -38,7 +39,10 @@ class NeomodelGenericViewSet(GenericViewSet):
 
         return obj
 
+
 class NeomodelCreateModelMixin(CreateModelMixin):
+    '''Adds additional Neomodel constraint validation not handled by Django REST framework'''
+
     def create(self, request, *args, **kwargs):
         try:
             return super().create(request, *args, **kwargs)
@@ -75,42 +79,40 @@ class RankerViewSet(ListModelMixin, NeomodelCreateModelMixin, RetrieveModelMixin
     def perform_destroy(self, instance):
         return delete_ranker(instance)
 
-@api_view(['GET', 'HEAD', 'POST', 'DELETE'])
-def ranker_knows(request, ranker_id: str, item_id: str):
-    errors = {}
 
-    # Check for existence of ranker and item
-    ranker = Ranker.nodes.first_or_none(ranker_id=ranker_id)
-    item = Item.nodes.first_or_none(item_id=item_id)
-    if not ranker:
-        errors['ranker_error'] = f'Ranker with id {ranker_id} not found'
-    if not item:
-        errors['item_error'] = f'Item with id {item_id} not found'
+class RankerKnowsViewSet(GenericViewSet):
+    def get_object(self):
+        try:
+            ranker = Ranker.nodes.get(ranker_id=self.kwargs['ranker_id'])
+            item = Item.nodes.get(item_id=self.kwargs['item_id'])
+        except DoesNotExist:
+            raise Http404
 
-    # Throw 404 if anything is missing
-    if errors:
-        return Response(status=status.HTTP_404_NOT_FOUND, data=errors)
+        self.check_object_permissions(self.request, ranker)
+        self.check_object_permissions(self.request, item)
 
-    if request.method == 'GET' or request.method == 'HEAD':
-        # Check if the ranker knows the item
-        if not ranker_knows_item(ranker, item):
-            # If they don't, return 204
+        return ranker, item
+
+    def retrieve(self, request, *args, **kwargs):
+        ranker, item = self.get_object()
+
+        if ranker_knows_item(ranker, item):
+            serializer = ItemSerializer(item)
+            return Response(serializer.data)
+        else:
             return Response(status=status.HTTP_204_NO_CONTENT)
 
-        # Otherwise return the serialized item on a GET request
-        serializer = ItemSerializer(item)
-        data = serializer.data if request.method == 'GET' else []
-        return Response(data=data, status=status.HTTP_200_OK)
-    elif request.method == 'POST':
-        # Check if we need to create relationship
+    def create(self, request, *args, **kwargs):
+        ranker, item = self.get_object()
         if ranker_knows_item(ranker, item):
-            return Response(data=[], status=status.HTTP_200_OK)
+            return Response(status=status.HTTP_200_OK)
+        else:
+            insert_ranker_knows(ranker, item)
+            serializer = ItemSerializer(item)
+            return Response(data=serializer.data, status=status.HTTP_201_CREATED)
 
-        # Create the relationship
-        insert_ranker_knows(ranker, item)
-        serializer = ItemSerializer(item)
-        return Response(data=serializer.data, status=status.HTTP_201_CREATED)
-    elif request.method == 'DELETE':
+    def destroy(self, request, *args, **kwargs):
+        ranker, item = self.get_object()
         delete_ranker_knows(ranker, item)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
