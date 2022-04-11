@@ -61,10 +61,8 @@ def authenticated_user_client(api_client, bake_user):
 def setup_neo4j_database():
     clear_neo4j_database(db)
     install_all_labels()
-    # Create three rankers with ids 123, 456, and 789
+    # Create ranker with id 123
     ranker_123 = Ranker(ranker_id='123').save()
-    # ranker_456 = Ranker(ranker_id='456').save()
-    # ranker_789 = Ranker(ranker_id='789').save()
 
     # Create six items with IDs A,B,C,D,E,F
     item_a = Item(item_id='A').save()
@@ -81,32 +79,8 @@ def setup_neo4j_database():
     ranker_123.known_items.connect(item_d)
     ranker_123.known_items.connect(item_e)
 
-    query = "MATCH (i:Item), (j:Item), (x:Ranker) "
-    query += "WHERE x.ranker_id = '123' AND "
-    query += "((i.item_id='A' AND j.item_id IN ['B','C']) OR"
-    query += "(i.item_id='B' AND j.item_id='E') OR "
-    query += "(i.item_id='C' AND j.item_id='E')) "
-    query += f"MERGE (i)-[:PREFERRED_TO_BY {{by:x.ranker_id}}]->(j) "
-    db.cypher_query(query)
-
-    # # Ranker 456 knows and prefers F->E->D->C->B and does not know A
-    # ranker_456.known_items.connect(item_b)
-    # ranker_456.known_items.connect(item_b)
-    # ranker_456.known_items.connect(item_c)
-    # ranker_456.known_items.connect(item_d)
-    # ranker_456.known_items.connect(item_e)
-    # ranker_456.known_items.connect(item_f)
-
-    # query = "MATCH (i:Item), (j:Item), (x:Ranker) "
-    # query += "WHERE x.ranker_id = '456' AND "
-    # query += "((i.item_id='F' AND j.item_id='E') OR"
-    # query += "(i.item_id='E' AND j.item_id='D') OR "
-    # query += "(i.item_id='D' AND j.item_id='C') OR "
-    # query += "(i.item_id='C' AND j.item_id='B')) "
-    # query += f"MERGE (i)-[:PREFERRED_TO_BY {{by:x.ranker_id}}]->(j) "
-    # db.cypher_query(query)
-
-    # # Ranker 789 knows A,C,E but has no known preferences between them, and does not know B,D,F
-    # ranker_789.known_items.connect(item_a)
-    # ranker_789.known_items.connect(item_c)
-    # ranker_789.known_items.connect(item_e)
+    item_a.preferred_to_items.connect(item_b, {'by':'123'})
+    item_a.preferred_to_items.connect(item_c, {'by':'123'})
+    item_a.preferred_to_items.connect(item_d, {'by':'123'})
+    item_b.preferred_to_items.connect(item_e, {'by':'123'})
+    item_c.preferred_to_items.connect(item_e, {'by':'123'})
