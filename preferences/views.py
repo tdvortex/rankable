@@ -1,47 +1,58 @@
+from django.http import Http404
 from django.shortcuts import render
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.viewsets import ViewSet
-from neomodel.exceptions import ConstraintValidationFailed
+from rest_framework.mixins import ListModelMixin, CreateModelMixin, RetrieveModelMixin, DestroyModelMixin
+from rest_framework.viewsets import GenericViewSet
+from neomodel.exceptions import ConstraintValidationFailed, DoesNotExist, UniqueProperty
 from .models import Ranker, Item
 from .cypher import (delete_direct_preference, delete_item, delete_ranker, delete_ranker_knows, direct_preference_exists,
                      get_direct_preferences, insert_preference, insert_ranker_knows, ranker_knows_item, topological_sort)
 from .serializers import RankerSerializer, ItemSerializer
 
 
-class ItemViewSet(ViewSet):
-    def list(self, request):
-        queryset = Item.nodes.all()
-        serializer = ItemSerializer(queryset, many=True)
-        return Response(data=serializer.data, status=status.HTTP_200_OK)
+class NeomodelGenericViewSet(GenericViewSet):
+    '''Overrides GenericViewSet to use neomodel configuration'''
+    def get_queryset(self):
+        return self.queryset.all()
 
-    def create(self, request):
-        serializer = ItemSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(data={'validation_error': 'Invalid data'}, status=status.HTTP_400_BAD_REQUEST)
+    def get_object(self):
+        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
 
+        assert lookup_url_kwarg in self.kwargs, (
+            'Expected view %s to be called with a URL keyword argument '
+            'named "%s". Fix your URL conf, or set the `.lookup_field` '
+            'attribute on the view correctly.' %
+            (self.__class__.__name__, lookup_url_kwarg)
+        )
+
+        filter_kwargs = {self.lookup_field: self.kwargs[lookup_url_kwarg]}
         try:
-            serializer.save()
-            return Response(data=serializer.data, status=status.HTTP_201_CREATED)
+            obj = self.queryset.get(**filter_kwargs)
+        except DoesNotExist:
+            raise Http404
+
+        # May raise a permission denied
+        self.check_object_permissions(self.request, obj)
+
+        return obj
+
+class NeomodelCreateModelMixin(CreateModelMixin):
+    def create(self, request, *args, **kwargs):
+        try:
+            return super().create(request, *args, **kwargs)
         except ConstraintValidationFailed:
-            return Response(data={'validation_error': 'Invalid data'}, status=status.HTTP_400_BAD_REQUEST)
-    
-    def retrieve(self, request, item_id:str):
-        item = Item.nodes.first_or_none(item_id=item_id)
-        if not item:
-            return Response(status=status.HTTP_404_NOT_FOUND, data={'error': f'Item with id {item_id} not found'})
+            return Response(status=status.HTTP_400_BAD_REQUEST)
 
-        serializer = ItemSerializer(item)
-        return Response(data=serializer.data, status=status.HTTP_200_OK)
 
-    def destroy(self, request, item_id:str):
-        item = Item.nodes.first_or_none(item_id=item_id)
-        if not item:
-            return Response(status=status.HTTP_404_NOT_FOUND, data={'error': f'Item with id {item_id} not found'})
-        delete_item(item)
-        return Response(status=status.HTTP_204_NO_CONTENT)
+class ItemViewSet(ListModelMixin, NeomodelCreateModelMixin, RetrieveModelMixin, DestroyModelMixin, NeomodelGenericViewSet):
+    queryset = Item.nodes
+    serializer_class = ItemSerializer
+    lookup_field = 'item_id'
 
+    def perform_destroy(self, instance):
+        return delete_item(instance)
 
 @api_view(['GET', 'HEAD', 'POST'])
 def ranker_list(request):

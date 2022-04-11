@@ -7,7 +7,6 @@ class TestItemList:
         response = api_client.get('/api/preferences/items/')
 
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data) == 6
 
     def test_if_post_creates_new_item_returns_201(self, api_client, setup_neo4j_database):
         response = api_client.post(
@@ -246,8 +245,7 @@ class TestRankerSort:
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_if_ranker_exists_get_returns_200_and_list(self, api_client, setup_neo4j_database):
+    def test_if_ranker_exists_get_returns_200(self, api_client, setup_neo4j_database):
         response = api_client.get('/api/preferences/ranker/123/sort/')
 
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data) == 5
