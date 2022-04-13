@@ -7,10 +7,12 @@ from rest_framework.mixins import ListModelMixin, CreateModelMixin, RetrieveMode
 from rest_framework.viewsets import GenericViewSet
 from neomodel.exceptions import ConstraintValidationFailed, DoesNotExist, UniqueProperty
 from .models import Ranker, Item
-from .cypher import (delete_direct_preference, delete_item, delete_ranker, delete_ranker_knows, direct_preference_exists,
-                     get_direct_preferences, insert_preference, insert_ranker_knows, ranker_knows_item, topological_sort)
+from .cypher import (delete_all_queued_compares, delete_direct_preference, delete_item, delete_ranker, delete_ranker_knows,
+                     direct_preference_exists, get_direct_preferences, insert_preference,
+                     insert_ranker_knows, list_queued_compares, ranker_knows_item, topological_sort, populate_queued_compares)
 from .serializers import RankerSerializer, ItemSerializer
 from .permissions import IsAdminOrReadOnly
+
 
 class NeomodelCreateModelMixin(CreateModelMixin):
     '''Adds additional Neomodel constraint validation not handled by Django REST framework'''
@@ -37,7 +39,6 @@ class ItemViewSet(ListModelMixin, NeomodelCreateModelMixin, RetrieveModelMixin, 
         self.check_object_permissions(self.request, obj)
 
         return obj
-
 
     def perform_destroy(self, instance):
         return delete_item(instance)
@@ -77,7 +78,27 @@ class RankerViewSet(ListModelMixin, NeomodelCreateModelMixin, RetrieveModelMixin
         ranker = self.get_object()
         sorted_known_items = topological_sort(ranker)
         serializer = ItemSerializer(sorted_known_items, many=True)
-        return Response(data=serializer.data, status=status.HTTP_200_OK)
+        return Response(data=serializer.data)
+
+    def get_comparisons_queue(self, request, *args, **kwargs):
+        ranker = self.get_object()
+        data = [[ItemSerializer(i).data, ItemSerializer(j).data]
+                for i, j in list_queued_compares(ranker)]
+
+        return Response(data)
+
+    def reset_comparisons_queue(self, request, *args, **kwargs):
+        ranker = self.get_object()
+        delete_all_queued_compares(ranker)
+        populate_queued_compares(ranker)
+        data = [[ItemSerializer(i).data, ItemSerializer(j).data]
+                for i, j in list_queued_compares(ranker)]
+        return Response(data, status=status.HTTP_201_CREATED)
+
+    def clear_comparisons_queue(self, request, *args, **kwargs):
+        ranker = self.get_object()
+        delete_all_queued_compares(ranker)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class RankerKnowsViewSet(GenericViewSet):
     def get_object(self):
@@ -115,12 +136,14 @@ class RankerKnowsViewSet(GenericViewSet):
         delete_ranker_knows(ranker, item)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+
 class RankerPairwiseViewSet(GenericViewSet):
     def get_object(self):
         try:
             ranker = Ranker.nodes.get(ranker_id=self.kwargs['ranker_id'])
             preferred = Item.nodes.get(item_id=self.kwargs['preferred_id'])
-            nonpreferred = Item.nodes.get(item_id=self.kwargs['nonpreferred_id'])
+            nonpreferred = Item.nodes.get(
+                item_id=self.kwargs['nonpreferred_id'])
         except DoesNotExist:
             raise Http404
 
@@ -149,8 +172,9 @@ class RankerPairwiseViewSet(GenericViewSet):
         if result == 'Invalid':
             return Response(status=status.HTTP_400_BAD_REQUEST,)
         else:
-            data = [ItemSerializer(preferred).data, ItemSerializer(nonpreferred).data]
-            
+            data = [ItemSerializer(preferred).data,
+                    ItemSerializer(nonpreferred).data]
+
             if result == 'Exists':
                 return Response(data, status=status.HTTP_200_OK)
             else:

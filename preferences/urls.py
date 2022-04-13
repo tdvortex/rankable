@@ -23,5 +23,9 @@ urlpatterns = [
                                               'post': 'create',
                                               'delete': 'destroy'})),
     path('ranker/<str:ranker_id>/sort/',
-         views.RankerViewSet.as_view({'get': 'get_sorted_list'}))
+         views.RankerViewSet.as_view({'get': 'get_sorted_list'})),
+    path('ranker/<str:ranker_id>/queue/',
+         views.RankerViewSet.as_view({'get': 'get_comparisons_queue',
+                                      'post': 'reset_comparisons_queue',
+                                      'delete': 'clear_comparisons_queue'}))
 ]

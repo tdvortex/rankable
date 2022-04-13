@@ -290,3 +290,33 @@ class TestRankerSort:
         response = api_client.get('/api/preferences/ranker/123/sort/')
 
         assert response.status_code == status.HTTP_200_OK
+
+class TestRankerQueue:
+    def test_if_ranker_dne_get_returns_404(self, api_client, setup_neo4j_database):
+        response = api_client.get('/api/preferences/ranker/xxx/queue/')
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_if_ranker_exists_get_returns_200(self, api_client, setup_neo4j_database):
+        response = api_client.get('/api/preferences/ranker/123/queue/')
+
+        assert response.status_code == status.HTTP_200_OK
+    def test_if_ranker_dne_post_returns_404(self, api_client, setup_neo4j_database):
+        response = api_client.post('/api/preferences/ranker/xxx/queue/')
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_if_ranker_exists_get_returns_201(self, api_client, setup_neo4j_database):
+        response = api_client.post('/api/preferences/ranker/123/queue/')
+
+        assert response.status_code == status.HTTP_201_CREATED
+
+    def test_if_ranker_dne_delete_returns_404(self, api_client, setup_neo4j_database):
+        response = api_client.delete('/api/preferences/ranker/xxx/queue/')
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_if_ranker_exists_delete_returns_204(self, api_client, setup_neo4j_database):
+        response = api_client.delete('/api/preferences/ranker/123/queue/')
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT

@@ -100,7 +100,7 @@ def default_preferences(default_ranker: Ranker, default_items):
                                           ('B', 'E'),
                                           ('C', 'E')]:
         default_items[id_preferred].preferred_to_items.connect(
-            default_items[id_nonpreferred], {'by': '123'})
+            default_items[id_nonpreferred], {'by': default_ranker.ranker_id})
     yield
     for id_preferred, id_nonpreferred in [('A', 'B'),
                                           ('A', 'C'),
@@ -112,7 +112,22 @@ def default_preferences(default_ranker: Ranker, default_items):
 
 
 @pytest.fixture
-def setup_neo4j_database(default_known, default_preferences):
+def default_queue(default_ranker: Ranker, default_items):
+    for left_id, right_id in [('B', 'C'), ('D', 'E')]:
+        default_items[left_id].queued_compares.connect(
+            default_items[right_id], {'by': default_ranker.ranker_id})
+        default_items[right_id].queued_compares.connect(
+            default_items[left_id], {'by': default_ranker.ranker_id})
+    yield
+    for left_id, right_id in [('B', 'C'), ('D', 'E')]:
+        default_items[left_id].queued_compares.disconnect(
+            default_items[right_id])
+        default_items[right_id].queued_compares.disconnect(
+            default_items[left_id])
+
+
+@pytest.fixture
+def setup_neo4j_database(default_known, default_preferences, default_queue):
     install_all_labels()
     yield
     clear_neo4j_database(db)
