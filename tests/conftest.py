@@ -7,6 +7,7 @@ from users.models import User
 from movies.models import Movie
 from preferences.models import Item, Ranker
 
+
 @pytest.fixture
 def api_client():
     '''An unauthenticated, userless client'''
@@ -58,29 +59,60 @@ def authenticated_user_client(api_client, bake_user):
 
 
 @pytest.fixture
-def setup_neo4j_database():
-    clear_neo4j_database(db)
+def admin_user_client(api_client):
+    '''Creates an admin user'''
+    api_client.force_authenticate(is_staff=True)
+    return api_client
+
+
+@pytest.fixture
+def default_ranker() -> Ranker:
+    print("Creating ranker")
+    ranker = Ranker(ranker_id='123').save()
+    yield ranker
+    ranker.delete()
+    print("Ranker deleted")
+
+
+@pytest.fixture
+def default_items():
+    ids = ['A', 'B', 'C', 'D', 'E', 'F']
+    items = {id: Item(item_id=id).save() for id in ids}
+    yield items
+    for item in items.values():
+        item.delete()
+
+
+@pytest.fixture
+def default_known(default_ranker: Ranker, default_items):
+    for id in ['A', 'B', 'C', 'D', 'E']:
+        default_ranker.known_items.connect(default_items[id])
+    yield
+    for id in ['A', 'B', 'C', 'D', 'E']:
+        default_ranker.known_items.disconnect(default_items[id])
+
+
+@pytest.fixture
+def default_preferences(default_ranker: Ranker, default_items):
+    for id_preferred, id_nonpreferred in [('A', 'B'),
+                                          ('A', 'C'),
+                                          ('A', 'D'),
+                                          ('B', 'E'),
+                                          ('C', 'E')]:
+        default_items[id_preferred].preferred_to_items.connect(
+            default_items[id_nonpreferred], {'by': '123'})
+    yield
+    for id_preferred, id_nonpreferred in [('A', 'B'),
+                                          ('A', 'C'),
+                                          ('A', 'D'),
+                                          ('B', 'E'),
+                                          ('C', 'E')]:
+        default_items[id_preferred].preferred_to_items.disconnect(
+            default_items[id_nonpreferred])
+
+
+@pytest.fixture
+def setup_neo4j_database(default_known, default_preferences):
     install_all_labels()
-    # Create ranker with id 123
-    ranker_123 = Ranker(ranker_id='123').save()
-
-    # Create six items with IDs A,B,C,D,E,F
-    item_a = Item(item_id='A').save()
-    item_b = Item(item_id='B').save()
-    item_c = Item(item_id='C').save()
-    item_d = Item(item_id='D').save()
-    item_e = Item(item_id='E').save()
-    item_f = Item(item_id='F').save()
-
-    # Ranker 123 knows and prefers A->B->E, A->C->E, A->D and does not know F
-    ranker_123.known_items.connect(item_a)
-    ranker_123.known_items.connect(item_b)
-    ranker_123.known_items.connect(item_c)
-    ranker_123.known_items.connect(item_d)
-    ranker_123.known_items.connect(item_e)
-
-    item_a.preferred_to_items.connect(item_b, {'by':'123'})
-    item_a.preferred_to_items.connect(item_c, {'by':'123'})
-    item_a.preferred_to_items.connect(item_d, {'by':'123'})
-    item_b.preferred_to_items.connect(item_e, {'by':'123'})
-    item_c.preferred_to_items.connect(item_e, {'by':'123'})
+    yield
+    clear_neo4j_database(db)

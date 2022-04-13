@@ -10,35 +10,7 @@ from .models import Ranker, Item
 from .cypher import (delete_direct_preference, delete_item, delete_ranker, delete_ranker_knows, direct_preference_exists,
                      get_direct_preferences, insert_preference, insert_ranker_knows, ranker_knows_item, topological_sort)
 from .serializers import RankerSerializer, ItemSerializer
-
-
-class NeomodelGenericViewSet(GenericViewSet):
-    '''Overrides GenericViewSet to use neomodel queryset construction'''
-
-    def get_queryset(self):
-        return self.queryset.all()
-
-    def get_object(self):
-        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
-
-        assert lookup_url_kwarg in self.kwargs, (
-            'Expected view %s to be called with a URL keyword argument '
-            'named "%s". Fix your URL conf, or set the `.lookup_field` '
-            'attribute on the view correctly.' %
-            (self.__class__.__name__, lookup_url_kwarg)
-        )
-
-        filter_kwargs = {self.lookup_field: self.kwargs[lookup_url_kwarg]}
-        try:
-            obj = self.queryset.get(**filter_kwargs)
-        except DoesNotExist:
-            raise Http404
-
-        # May raise a permission denied
-        self.check_object_permissions(self.request, obj)
-
-        return obj
-
+from .permissions import IsAdminOrReadOnly
 
 class NeomodelCreateModelMixin(CreateModelMixin):
     '''Adds additional Neomodel constraint validation not handled by Django REST framework'''
@@ -50,19 +22,41 @@ class NeomodelCreateModelMixin(CreateModelMixin):
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
 
-class ItemViewSet(ListModelMixin, NeomodelCreateModelMixin, RetrieveModelMixin, DestroyModelMixin, NeomodelGenericViewSet):
+class ItemViewSet(ListModelMixin, NeomodelCreateModelMixin, RetrieveModelMixin, DestroyModelMixin, GenericViewSet):
     queryset = Item.nodes
     serializer_class = ItemSerializer
     lookup_field = 'item_id'
+    permission_classes = [IsAdminOrReadOnly]
+
+    def get_object(self):
+        try:
+            obj = Item.nodes.get(item_id=self.kwargs['item_id'])
+        except DoesNotExist:
+            raise Http404
+
+        self.check_object_permissions(self.request, obj)
+
+        return obj
+
 
     def perform_destroy(self, instance):
         return delete_item(instance)
 
 
-class RankerViewSet(ListModelMixin, NeomodelCreateModelMixin, RetrieveModelMixin, DestroyModelMixin, NeomodelGenericViewSet):
+class RankerViewSet(ListModelMixin, NeomodelCreateModelMixin, RetrieveModelMixin, DestroyModelMixin, GenericViewSet):
     queryset = Ranker.nodes
     serializer_class = RankerSerializer
     lookup_field = 'ranker_id'
+
+    def get_object(self):
+        try:
+            obj = Ranker.nodes.get(ranker_id=self.kwargs['ranker_id'])
+        except DoesNotExist:
+            raise Http404
+
+        self.check_object_permissions(self.request, obj)
+
+        return obj
 
     def retrieve(self, request, *args, **kwargs):
         ranker = self.get_object()
