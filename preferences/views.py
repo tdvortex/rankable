@@ -1,4 +1,3 @@
-from re import I
 from django.http import Http404
 from rest_framework.response import Response
 from rest_framework import status
@@ -7,8 +6,9 @@ from rest_framework.permissions import IsAuthenticated
 from neomodel.exceptions import DoesNotExist
 from .models import Ranker, Item
 from .cypher import (delete_all_queued_compares, delete_direct_preference, delete_ranker_knows,
-                     direct_preference_exists, get_direct_preferences, insert_preference,
-                     insert_ranker_knows, list_queued_compares, ranker_knows_item, topological_sort, populate_queued_compares)
+                     direct_preference_exists, get_direct_preferences, insert_preference, insert_ranker_does_not_know,
+                     insert_ranker_knows, list_queued_compares, ranker_does_not_know_item, ranker_knows_item, 
+                     topological_sort, populate_queued_compares, list_undefined_known_items)
 from .serializers import RankerSerializer, ItemSerializer
 
 def get_serializer_for_item(self, item:Item):
@@ -99,13 +99,20 @@ class RankerKnowsViewSet(GenericViewSet):
 
         if ranker_knows_item(ranker, item):
             return Response(data={'knows':True})
-        else:
+        elif ranker_does_not_know_item(ranker, item):
             return Response(data={'knows':False})
+        else:
+            return Response(data={'knows':'undefined'})
 
     def create(self, request, *args, **kwargs):
         ranker = self.get_ranker()
         item = self.get_item()
-        if ranker_knows_item(ranker, item):
+        if self.kwargs['knows'] == False and ranker_does_not_know_item(ranker, item):
+            return Response(data={'knows':False}, status=status.HTTP_200_OK)
+        elif self.kwargs['knows'] == False:
+            insert_ranker_does_not_know(ranker, item)
+            return Response(data={'knows':False}, status=status.HTTP_201_CREATED)
+        elif ranker_knows_item(ranker, item):
             return Response(data={'knows':True}, status=status.HTTP_200_OK)
         else:
             insert_ranker_knows(ranker, item)
@@ -114,9 +121,17 @@ class RankerKnowsViewSet(GenericViewSet):
     def destroy(self, request, *args, **kwargs):
         ranker = self.get_ranker()
         item = self.get_item()
-        delete_ranker_knows(ranker, item)
-        return Response(data={'knows':False})
+        if ranker_knows_item(ranker, item):
+            delete_ranker_knows(ranker, item)
+        if ranker_does_not_know_item(ranker, item):
+            ranker.unknown_items.disconnect(item)
+        return Response(data={'knows':'undefined'})
 
+    def discover(self, request, *args, **kwargs):
+        ranker = self.get_ranker()
+        discoverable_items = list_undefined_known_items(ranker)
+        data = [self.serialize_item(item).data for item in discoverable_items]
+        return Response(data=data)
 
 class RankerPairwiseViewSet(GenericViewSet):
     serializer_class = RankerSerializer

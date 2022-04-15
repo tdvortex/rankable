@@ -5,10 +5,11 @@ from neomodel import db
 def ranker_knows_item(ranker: Ranker, item: Item) -> bool:
     return item in ranker.known_items.all()
 
+def ranker_does_not_know_item(ranker: Ranker, item: Item) -> bool:
+    return item in ranker.unknown_items.all()
 
 def direct_preference_exists(ranker: Ranker, preferred: Item, nonpreferred: Item):
     return nonpreferred in preferred.preferred_to_items.match(by=ranker.ranker_id)
-
 
 def indirect_preference_exists(ranker: Ranker, preferred: Item, nonpreferred: Item):
     query = "MATCH p=(i:Item)-[r:PREFERRED_TO_BY*]->(j:Item) "
@@ -32,7 +33,14 @@ def queued_preference_may_exist(ranker: Ranker, preferred: Item, nonpreferred: I
 
 # Create operations
 def insert_ranker_knows(ranker: Ranker, item: Item):
+    if ranker_does_not_know_item(ranker, item):
+        ranker.unknown_items.disconnect(item)
     ranker.known_items.connect(item)
+
+def insert_ranker_does_not_know(ranker: Ranker, item: Item):
+    if ranker_knows_item(ranker, item):
+        delete_ranker_knows(ranker, item)
+    ranker.unknown_items.connect(item)
 
 
 def insert_preference(ranker: Ranker, preferred: Item, nonpreferred: Item):
@@ -132,6 +140,17 @@ def populate_queued_compares(ranker: Ranker):
         if not success:
             break
         left, right = get_random_possible_queued_compare(ranker)
+
+def list_undefined_known_items(ranker: Ranker):
+    query = "MATCH (r:Ranker), (i:Item) "
+    query += f"WHERE r.ranker_id='{ranker.ranker_id}' "
+    query += "AND NOT EXISTS((r)-[:KNOWS]->(i)) " 
+    query += "AND NOT EXISTS((r)-[:DOES_NOT_KNOW]->(i)) "
+    query += "RETURN i, rand() as x ORDER BY x LIMIT 100"
+    results, _ = db.cypher_query(query)
+
+    return [Item.inflate(row[0]) for row in results]
+
 
 # Delete operations
 def delete_direct_preference(ranker: Ranker, preferred: Item, nonpreferred: Item):

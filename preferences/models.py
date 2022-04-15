@@ -20,5 +20,6 @@ class Ranker(DjangoNode):
     '''Profile for a user who provides rankings for items'''
     ranker_id = StringProperty(required=True, unique_index=True, primary_key=True)
     known_items = RelationshipTo('Item', 'KNOWS')
+    unknown_items = RelationshipTo('Item', 'DOES_NOT_KNOW')
     class Meta:
         app_label = 'preferences'

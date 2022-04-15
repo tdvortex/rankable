@@ -14,6 +14,8 @@ urlpatterns = [
          views.RankerKnowsViewSet.as_view({'get': 'retrieve',
                                            'post': 'create',
                                            'delete': 'destroy'})),
+    path('discover/',
+         views.RankerKnowsViewSet.as_view({'get': 'discover'})),
     path('prefers/',
          views.RankerPairwiseViewSet.as_view({'get': 'list'})),
     path('prefers/<str:preferred_id>/<str:nonpreferred_id>/',
