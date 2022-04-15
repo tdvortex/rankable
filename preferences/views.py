@@ -11,15 +11,17 @@ from .cypher import (delete_all_queued_compares, delete_direct_preference, delet
                      insert_ranker_knows, list_queued_compares, ranker_knows_item, topological_sort, populate_queued_compares)
 from .serializers import RankerSerializer, ItemSerializer
 
-def get_serializer_for_item(item:Item):
+def get_serializer_for_item(self, item:Item):
     # Default behavior
     return ItemSerializer(item)
 
 class RankerViewSet(GenericViewSet):
-    queryset = Ranker.nodes
     serializer_class = RankerSerializer
     permission_classes = [IsAuthenticated]
     serialize_item = get_serializer_for_item
+
+    def get_queryset(self):
+        pass
 
     def get_object(self):
         try:
@@ -58,9 +60,12 @@ class RankerViewSet(GenericViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 class RankerKnowsViewSet(GenericViewSet):
+    serializer_class = RankerSerializer
     permission_classes = [IsAuthenticated]
-    serializer_class = ItemSerializer
     serialize_item = get_serializer_for_item
+
+    def get_queryset(self):
+        pass
 
     def get_ranker(self):
         try:
@@ -114,8 +119,12 @@ class RankerKnowsViewSet(GenericViewSet):
 
 
 class RankerPairwiseViewSet(GenericViewSet):
+    serializer_class = RankerSerializer
     permission_classes = [IsAuthenticated]
     serialize_item = get_serializer_for_item
+
+    def get_queryset(self):
+        pass
 
     def get_ranker(self):
         try:

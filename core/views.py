@@ -4,7 +4,7 @@ from movies.models import Movie
 from movies.serializers import SimpleMovieSerializer
 from preferences.views import RankerKnowsViewSet, RankerPairwiseViewSet, RankerViewSet
 
-def get_simple_movie_from_item(item: Item):
+def get_simple_movie_from_item(self, item: Item):
     movie = Movie.objects.get(id=item.item_id)
     return SimpleMovieSerializer(movie)
 

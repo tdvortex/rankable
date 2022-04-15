@@ -98,8 +98,9 @@ def topological_sort(ranker: Ranker):
 
 def list_queued_compares(ranker: Ranker):
     # Get any existing comparisons to be made
-    query = "MATCH (i:Item)-[r:COMPARE_WITH_BY]-(j:Item) "
+    query = "MATCH (i:Item)-[r:COMPARE_WITH_BY]->(j:Item) "
     query += f"WHERE r.by='{ranker.ranker_id}' "
+    query += f"AND id(i) < id(j) "
     query += "RETURN i,j"
     results, _ = db.cypher_query(query)
 
