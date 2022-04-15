@@ -32,40 +32,72 @@ def queued_preference_may_exist(ranker: Ranker, preferred: Item, nonpreferred: I
     return results[0][0]
 
 # Create operations
-def insert_ranker_knows(ranker: Ranker, item: Item):
-    if ranker_does_not_know_item(ranker, item):
-        ranker.unknown_items.disconnect(item)
-    ranker.known_items.connect(item)
+def insert_ranker_knows(ranker: Ranker, new_known_items: list[Item], new_unknown_items: list[Item]):
+    if new_known_items:
+        with db.transaction:
+            # Remove that they do not know each item
+            query = "MATCH (r:Ranker)-[d:DOES_NOT_KNOW]->(i:Item) "
+            query += f"WHERE r.ranker_id='{ranker.ranker_id}' "
+            query += f"AND i.item_id IN [{[item.id for item in new_known_items]}] "
+            query += f"DELETE d"
+            db.cypher_query(query)
 
-def insert_ranker_does_not_know(ranker: Ranker, item: Item):
-    if ranker_knows_item(ranker, item):
-        delete_ranker_knows(ranker, item)
-    ranker.unknown_items.connect(item)
+            # Add that they do know each item
+            query = "MATCH (r:Ranker), (i:Item) "
+            query += f"WHERE r.ranker_id='{ranker.ranker_id}' "
+            query += f"AND i.item_id IN [{[item.id for item in new_known_items]}] "
+            query += f"MERGE (r)-[:KNOWS]->(i)"
+            db.cypher_query(query)
+
+    if new_unknown_items:
+        with db.transaction:
+            # Delete any existing preferences or queued comparisons
+            query = "MATCH (i:Item)-[pc:PREFERRED_TO_BY|COMPARE_WITH_BY]-(:Item) "
+            query += f"WHERE pc.by='{ranker.ranker_id}' "
+            query += f"AND i.item_id IN [{[item.id for item in new_unknown_items]}] "
+            query += f"DELETE pc"
+            db.cypher_query(query)
+
+            # Remove that they know each item
+            query = "MATCH (r:Ranker)-[d:KNOWS]->(i:Item) "
+            query += f"WHERE r.ranker_id='{ranker.ranker_id}' "
+            query += f"AND i.item_id IN [{[item.id for item in new_unknown_items]}] "
+            query += f"DELETE d"
+            db.cypher_query(query)
+
+            # Add that they do not know each item
+            query = "MATCH (r:Ranker), (i:Item) "
+            query += f"WHERE r.ranker_id='{ranker.ranker_id}' "
+            query += f"AND i.item_id IN [{[item.id for item in new_unknown_items]}] "
+            query += f"MERGE (r)-[:DOES_NOT_KNOW]->(i)"
+            db.cypher_query(query)
 
 
-def insert_preference(ranker: Ranker, preferred: Item, nonpreferred: Item):
-    with db.transaction:
-        if not ranker_knows_item(ranker, preferred) or not ranker_knows_item(ranker, nonpreferred):
-            # Ranker must know both items to have a preference
-            return 'Invalid'
+def insert_preferences(ranker: Ranker, new_preferences: list[tuple[Item,Item]]):
+    warnings = []
 
-        if indirect_preference_exists(ranker, preferred=nonpreferred, nonpreferred=preferred):
-            # Preference must not violate existing preferences and create a cycle
-            return 'Invalid'
+    for preferred, nonpreferred in new_preferences:
+        with db.transaction:
+            # If this preference were a queued comparison, we remove that comparison from the queue
+            query = "MATCH (i:Item)-[r:COMPARE_WITH_BY]-(j:Item) "
+            query += f"WHERE i.item_id='{preferred.item_id}' AND j.item_id='{nonpreferred.item_id}' AND r.by='{ranker.ranker_id}' "
+            query += "DELETE r"
+            db.cypher_query(query)
 
-        if direct_preference_exists(ranker, preferred, nonpreferred):
-            return 'Exists'
-
-        # If this preference were a comparison, we remove that comparison from the queue
-        # We do this regardless of whether the preference is valid or not;
-        query = "MATCH (i:Item)-[r:COMPARE_WITH_BY]-(j:Item) "
-        query += f"WHERE i.item_id='{preferred.item_id}' AND j.item_id='{nonpreferred.item_id}' AND r.by='{ranker.ranker_id}' "
-        query += "DELETE r"
-        db.cypher_query(query)
-
-        preferred.preferred_to_items.connect(nonpreferred,
-                                             {'by': ranker.ranker_id})
-        return 'Created'
+            if not ranker_knows_item(ranker, preferred):
+                warnings.append(f'Item {preferred.item_id} is not known')
+            elif not ranker_knows_item(ranker, nonpreferred):
+                warnings.append(f'Item {nonpreferred.item_id} is not known')
+            elif indirect_preference_exists(ranker, preferred=nonpreferred, nonpreferred=preferred):
+                # Preference must not violate existing preferences and create a cycle
+                warnings.append(f'Cannot create cyclic preference for {preferred.item_id}, {nonpreferred.item_id}')
+            elif direct_preference_exists(ranker, preferred, nonpreferred):
+                warnings.append(f'Preference already exists for {preferred.item_id}, {nonpreferred.item_id}')
+            else:
+                preferred.preferred_to_items.connect(nonpreferred,
+                                                    {'by': ranker.ranker_id})
+    
+    return warnings
 
 
 def insert_queued_compare(ranker: Ranker, left: Item, right: Item):
@@ -167,22 +199,24 @@ def delete_direct_preference(ranker: Ranker, preferred: Item, nonpreferred: Item
 def delete_ranker_knows(ranker: Ranker, item: Item):
     with db.transaction:
         # Delete all direct preferences the ranker has (or has queued) for this item in both directions
-        del_preference_query = "MATCH (i:Item)-[r:PREFERRED_TO_BY|COMPARE_WITH_BY]-(:Item) "
-        del_preference_query += f"WHERE i.item_id='{item.item_id}' AND r.by='{ranker.ranker_id}'"
-        del_preference_query += "DELETE r"
-
+        del_preference_query = "MATCH (i:Item)-[pc:PREFERRED_TO_BY|COMPARE_WITH_BY]-(:Item) "
+        del_preference_query += f"WHERE i.item_id='{item.item_id}' AND pc.by='{ranker.ranker_id}'"
+        del_preference_query += "DELETE pc"
         db.cypher_query(del_preference_query)
 
         # Then delete this KNOWS relationship
-        ranker.known_items.disconnect(item)
+        del_preference_query = "MATCH (r:Ranker)-[kdk:KNOWS|DOES_NOT_KNOW]->(i:Item) "
+        del_preference_query += f"WHERE i.item_id='{item.item_id}' AND r.ranker_id='{ranker.ranker_id}'"
+        del_preference_query += "DELETE kdk"
+        db.cypher_query(del_preference_query)
 
 
 def delete_ranker(ranker: Ranker):
     with db.transaction:
         # Delete all preferences the ranker has (or has queued) for all items in both directions
-        del_preference_query = f"MATCH (:Item)-[r:PREFERRED_TO_BY|COMPARE_WITH_BY]-(:Item) "
-        del_preference_query += f"WHERE r.by = '{ranker.ranker_id}' "
-        del_preference_query += f"DELETE r"
+        del_preference_query = f"MATCH (:Item)-[pc:PREFERRED_TO_BY|COMPARE_WITH_BY]-(:Item) "
+        del_preference_query += f"WHERE pc.by = '{ranker.ranker_id}' "
+        del_preference_query += f"DELETE pc"
         db.cypher_query(del_preference_query)
 
         # Delete all KNOWS relationships the ranker has for all items
@@ -204,7 +238,7 @@ def delete_item(item: Item):
 
 
 def delete_all_queued_compares(ranker: Ranker):
-    query = "MATCH (:Item)-[r:COMPARE_WITH_BY]-(:Item) "
-    query += f"WHERE r.by='{ranker.ranker_id}' "
-    query += "DELETE r"
+    query = "MATCH (:Item)-[c:COMPARE_WITH_BY]-(:Item) "
+    query += f"WHERE c.by='{ranker.ranker_id}' "
+    query += "DELETE c"
     db.cypher_query(query)
