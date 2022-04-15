@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import Ranker, Item
 
 class RankerSerializer(serializers.Serializer):
-    ranker_id = serializers.CharField(required=True)
+    ranker_id = serializers.UUIDField(required=True)
 
     def create(self, validated_data):
         return Ranker(**validated_data).save()

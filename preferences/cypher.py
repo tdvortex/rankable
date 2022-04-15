@@ -1,4 +1,3 @@
-import re
 from .models import Item, Ranker
 from neomodel import db
 
@@ -79,6 +78,13 @@ def insert_queued_compare(ranker: Ranker, left: Item, right: Item):
 
 
 # Retrieve operations
+def get_direct_preference_count(ranker: Ranker):
+    query = "MATCH p=(i:Item)-[r:PREFERRED_TO_BY]->(j:Item) "
+    query += f"WHERE r.by='{ranker.ranker_id}'"
+    query += "RETURN count(p)" 
+    results, _ = db.cypher_query(query)
+    return results[0][0]
+
 def get_direct_preferences(ranker: Ranker) -> list[tuple[Item, Item]]:
     query = "MATCH (i:Item)-[r:PREFERRED_TO_BY]->(j:Item) "
     query += f"WHERE r.by='{ranker.ranker_id}'"

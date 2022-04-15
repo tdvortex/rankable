@@ -132,3 +132,5 @@ DJOSER = {
         'current_user': 'users.serializers.UserSerializer',
     }
 }
+
+RANKED_ITEM_MODEL = 'movies.Movie'
