@@ -111,9 +111,9 @@ class RankerKnowsViewSet(GenericViewSet):
         ranker = self.get_ranker()
         try:
             new_known_items = [Item.nodes.get(item_id=i)
-                               for i in self.kwargs['new_known_ids']]
+                               for i in self.request.data['new_known_ids']]
             new_unknown_items = [Item.nodes.get(item_id=i)
-                                 for i in self.kwargs['new_unknown_ids']]
+                                 for i in self.request.data['new_unknown_ids']]
         except DoesNotExist:
             raise Http404
 
@@ -194,7 +194,7 @@ class RankerPairwiseViewSet(GenericViewSet):
 
         try:
             new_preferences = [(Item.nodes.get(item_id=i), Item.nodes.get(item_id=j))
-                               for i,j in self.kwargs['new_preference_ids']]
+                               for i,j in self.request.data['new_preference_ids']]
         except DoesNotExist:
             raise Http404
 
