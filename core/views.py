@@ -1,20 +1,25 @@
-from django.shortcuts import render
-from preferences.models import Item
-from movies.models import Movie
+from movies.models import Movie as MovieSql
+from core.models import Movie as MovieNode, User as UserNode
 from movies.serializers import SimpleMovieSerializer
 from preferences.views import RankerKnowsViewSet, RankerPairwiseViewSet, RankerViewSet
 
-def get_simple_movie_from_item(self, item: Item):
-    movie = Movie.objects.get(id=item.item_id)
+def get_simple_movie_from_node(self, movie_node: MovieNode):
+    movie = MovieSql.objects.get(id=movie_node.item_id)
     return SimpleMovieSerializer(movie)
 
 class MovieRankerViewSet(RankerViewSet):
-    serialize_item = get_simple_movie_from_item
+    ranker_class = UserNode
+    item_class = MovieNode
+    serialize_item = get_simple_movie_from_node
 
 class MovieRankerKnowsViewSet(RankerKnowsViewSet):
-    serialize_item = get_simple_movie_from_item
+    ranker_class = UserNode
+    item_class = MovieNode
+    serialize_item = get_simple_movie_from_node
 
 class MovieRankerPairwiseViewSet(RankerPairwiseViewSet):
-    serialize_item = get_simple_movie_from_item
+    ranker_class = UserNode
+    item_class = MovieNode
+    serialize_item = get_simple_movie_from_node
 
 

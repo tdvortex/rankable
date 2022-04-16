@@ -1,4 +1,3 @@
-import json
 from django.http import Http404
 from rest_framework.response import Response
 from rest_framework import status
@@ -21,6 +20,8 @@ def get_serializer_for_item(self, item: Item):
 class RankerViewSet(GenericViewSet):
     serializer_class = RankerSerializer
     permission_classes = [IsAuthenticated]
+    ranker_class = Ranker
+    item_class = Item
     serialize_item = get_serializer_for_item
 
     def get_queryset(self):
@@ -28,7 +29,7 @@ class RankerViewSet(GenericViewSet):
 
     def get_object(self):
         try:
-            obj = Ranker.nodes.get(ranker_id=self.request.user.id)
+            obj = self.ranker_class.nodes.get(ranker_id=self.request.user.id)
         except DoesNotExist:
             raise Http404
 
@@ -38,34 +39,36 @@ class RankerViewSet(GenericViewSet):
 
     def get_sorted_list(self, request, *args, **kwargs):
         ranker = self.get_object()
-        sorted_known_items = topological_sort(ranker)
+        sorted_known_items = topological_sort(ranker, self.item_class)
         data = [self.serialize_item(item).data for item in sorted_known_items]
         return Response(data)
 
     def get_comparisons_queue(self, request, *args, **kwargs):
         ranker = self.get_object()
         data = [[self.serialize_item(i).data, self.serialize_item(j).data]
-                for i, j in list_queued_compares(ranker)]
+                for i, j in list_queued_compares(ranker, self.item_class)]
 
         return Response(data)
 
     def reset_comparisons_queue(self, request, *args, **kwargs):
         ranker = self.get_object()
-        delete_all_queued_compares(ranker)
-        populate_queued_compares(ranker)
+        delete_all_queued_compares(ranker, self.item_class)
+        populate_queued_compares(ranker, self.item_class)
         data = [[self.serialize_item(i).data, self.serialize_item(j).data]
-                for i, j in list_queued_compares(ranker)]
+                for i, j in list_queued_compares(ranker, self.item_class)]
         return Response(data, status=status.HTTP_201_CREATED)
 
     def clear_comparisons_queue(self, request, *args, **kwargs):
         ranker = self.get_object()
-        delete_all_queued_compares(ranker)
+        delete_all_queued_compares(ranker, self.item_class)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class RankerKnowsViewSet(GenericViewSet):
     serializer_class = RankerSerializer
     permission_classes = [IsAuthenticated]
+    ranker_class = Ranker
+    item_class = Item
     serialize_item = get_serializer_for_item
 
     def get_queryset(self):
@@ -73,7 +76,7 @@ class RankerKnowsViewSet(GenericViewSet):
 
     def get_ranker(self):
         try:
-            ranker = Ranker.nodes.get(ranker_id=self.request.user.id)
+            ranker = self.ranker_class.nodes.get(ranker_id=self.request.user.id)
         except DoesNotExist:
             raise Http404
 
@@ -83,7 +86,7 @@ class RankerKnowsViewSet(GenericViewSet):
 
     def get_item(self):
         try:
-            item = Item.nodes.get(item_id=self.kwargs['item_id'])
+            item = self.item_class.nodes.get(item_id=self.kwargs['item_id'])
         except DoesNotExist:
             raise Http404
 
@@ -111,9 +114,9 @@ class RankerKnowsViewSet(GenericViewSet):
     def create(self, request, *args, **kwargs):
         ranker = self.get_ranker()
         try:
-            known_items = [Item.nodes.get(item_id=i)
+            known_items = [self.item_class.nodes.get(item_id=i)
                            for i in self.request.data['known_ids']]
-            unknown_items = [Item.nodes.get(item_id=i)
+            unknown_items = [self.item_class.nodes.get(item_id=i)
                              for i in self.request.data['unknown_ids']]
         except DoesNotExist:
             raise Http404
@@ -132,7 +135,7 @@ class RankerKnowsViewSet(GenericViewSet):
 
     def discover(self, request, *args, **kwargs):
         ranker = self.get_ranker()
-        discoverable_items = list_undefined_known_items(ranker)
+        discoverable_items = list_undefined_known_items(ranker, self.item_class)
         data = [self.serialize_item(item).data for item in discoverable_items]
         return Response(data=data)
 
@@ -140,6 +143,8 @@ class RankerKnowsViewSet(GenericViewSet):
 class RankerPairwiseViewSet(GenericViewSet):
     serializer_class = RankerSerializer
     permission_classes = [IsAuthenticated]
+    ranker_class = Ranker
+    item_class = Item
     serialize_item = get_serializer_for_item
 
     def get_queryset(self):
@@ -147,7 +152,7 @@ class RankerPairwiseViewSet(GenericViewSet):
 
     def get_ranker(self):
         try:
-            ranker = Ranker.nodes.get(ranker_id=self.request.user.id)
+            ranker = self.ranker_class.nodes.get(ranker_id=self.request.user.id)
         except DoesNotExist:
             raise Http404
 
@@ -157,8 +162,8 @@ class RankerPairwiseViewSet(GenericViewSet):
 
     def get_items(self):
         try:
-            preferred = Item.nodes.get(item_id=self.kwargs['preferred_id'])
-            nonpreferred = Item.nodes.get(
+            preferred = self.item_class.nodes.get(item_id=self.kwargs['preferred_id'])
+            nonpreferred = self.item_class.nodes.get(
                 item_id=self.kwargs['nonpreferred_id'])
         except DoesNotExist:
             raise Http404
@@ -170,10 +175,10 @@ class RankerPairwiseViewSet(GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         ranker = self.get_ranker()
-        ranker_data = RankerSerializer(ranker).data
+        ranker_data = self.serializer_class(ranker).data
 
         preference_data = [[self.serialize_item(i).data, self.serialize_item(j).data]
-                           for i, j in get_direct_preferences(ranker)]
+                           for i, j in get_direct_preferences(ranker, self.item_class)]
 
         # Combine into a single JSON object
         data = {'ranker': ranker_data, 'preferences': preference_data}
@@ -194,8 +199,8 @@ class RankerPairwiseViewSet(GenericViewSet):
         ranker = self.get_ranker()
 
         try:
-            preferences = [(Item.nodes.get(item_id=preference['preferred_id']),
-                            Item.nodes.get(item_id=preference['nonpreferred_id']))
+            preferences = [(self.item_class.nodes.get(item_id=preference['preferred_id']),
+                            self.item_class.nodes.get(item_id=preference['nonpreferred_id']))
                            for preference in self.request.data['preferences']]
         except DoesNotExist:
             raise Http404

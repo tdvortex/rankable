@@ -117,37 +117,45 @@ def insert_queued_compare(ranker: Ranker, left: Item, right: Item):
 
 
 # Retrieve operations
-def get_direct_preferences(ranker: Ranker) -> list[tuple[Item, Item]]:
-    query = "MATCH (i:Item)-[r:PREFERRED_TO_BY]->(j:Item) "
+def get_direct_preferences(ranker: Ranker, item_class) -> list[tuple[Item, Item]]:
+    item_labels = ':'.join(item_class.inherited_labels())
+
+    query = f"MATCH (i:{item_labels})-[r:PREFERRED_TO_BY]->(j:{item_labels}) "
     query += f"WHERE r.by='{ranker.ranker_id}'"
     query += "RETURN i,j"
 
     results, _ = db.cypher_query(query)
-    return [(Item.inflate(row[0]), Item.inflate(row[1])) for row in results]
+    return [(item_class.inflate(row[0]), item_class.inflate(row[1])) for row in results]
 
 
-def topological_sort(ranker: Ranker):
-    query = f"MATCH (:Ranker {{ranker_id:'{ranker.ranker_id}'}})-[:KNOWS]->(i:Item) "
+def topological_sort(ranker: Ranker, item_class):
+    item_labels = ':'.join(item_class.inherited_labels())
+
+    query = f"MATCH (:Ranker {{ranker_id:'{ranker.ranker_id}'}})-[:KNOWS]->(i:{item_labels}) "
     query += "RETURN i "
-    query += f"ORDER BY size([(i:Item)-[:PREFERRED_TO_BY*{{by:'{ranker.ranker_id}'}}]->(j:Item) | j.item_id]) DESC"
+    query += f"ORDER BY size([(i)-[:PREFERRED_TO_BY*{{by:'{ranker.ranker_id}'}}]->(j:{item_labels}) | j.item_id]) DESC"
 
     results, _ = db.cypher_query(query)
-    return [Item.inflate(row[0]) for row in results]
+    return [item_class.inflate(row[0]) for row in results]
 
 
-def list_queued_compares(ranker: Ranker):
+def list_queued_compares(ranker: Ranker, item_class):
+    item_labels = ':'.join(item_class.inherited_labels())
+
     # Get any existing comparisons to be made
-    query = "MATCH (i:Item)-[r:COMPARE_WITH_BY]->(j:Item) "
+    query = f"MATCH (i:{item_labels})-[r:COMPARE_WITH_BY]->(j:{item_labels}) "
     query += f"WHERE r.by='{ranker.ranker_id}' "
     query += f"AND id(i) < id(j) "
     query += "RETURN i,j"
     results, _ = db.cypher_query(query)
 
-    return [(Item.inflate(row[0]), Item.inflate(row[1])) for row in results]
+    return [(item_class.inflate(row[0]), item_class.inflate(row[1])) for row in results]
 
 
-def get_random_possible_queued_compare(ranker: Ranker):
-    query = "MATCH (i:Item), (j:Item) "
+def get_random_possible_queued_compare(ranker: Ranker, item_class):
+    item_labels = ':'.join(item_class.inherited_labels())
+
+    query = f"MATCH (i:{item_labels}), (j:{item_labels}) "
     query += f"WHERE EXISTS((:Ranker {{ranker_id:'{ranker.ranker_id}'}})-[:KNOWS]->(i)) "
     query += f"AND EXISTS((:Ranker {{ranker_id:'{ranker.ranker_id}'}})-[:KNOWS]->(j)) "
     query += f"AND NOT EXISTS((i)-[:PREFERRED_TO_BY|COMPARE_WITH_BY* {{by:'{ranker.ranker_id}'}}]->(j)) "
@@ -160,27 +168,29 @@ def get_random_possible_queued_compare(ranker: Ranker):
     if not results:
         return None, None
 
-    return Item.inflate(results[0][0]), Item.inflate(results[0][1])
+    return item_class.inflate(results[0][0]), item_class.inflate(results[0][1])
 
 
-def populate_queued_compares(ranker: Ranker):
-    left, right = get_random_possible_queued_compare(ranker)
+def populate_queued_compares(ranker: Ranker, item_class):
+    left, right = get_random_possible_queued_compare(ranker, item_class)
 
     while left is not None:
         success = insert_queued_compare(ranker, left, right)
         if not success:
             break
-        left, right = get_random_possible_queued_compare(ranker)
+        left, right = get_random_possible_queued_compare(ranker, item_class)
 
-def list_undefined_known_items(ranker: Ranker):
-    query = "MATCH (r:Ranker), (i:Item) "
+def list_undefined_known_items(ranker: Ranker, item_class):
+    item_labels = ':'.join(item_class.inherited_labels())
+
+    query = f"MATCH (r:Ranker), (i:{item_labels}) "
     query += f"WHERE r.ranker_id='{ranker.ranker_id}' "
     query += "AND NOT EXISTS((r)-[:KNOWS]->(i)) " 
     query += "AND NOT EXISTS((r)-[:DOES_NOT_KNOW]->(i)) "
     query += "RETURN i, rand() as x ORDER BY x LIMIT 100"
     results, _ = db.cypher_query(query)
 
-    return [Item.inflate(row[0]) for row in results]
+    return [item_class.inflate(row[0]) for row in results]
 
 
 # Delete operations
@@ -189,7 +199,7 @@ def delete_direct_preference(ranker: Ranker, preferred: Item, nonpreferred: Item
         if not direct_preference_exists:
             return 'Invalid'
 
-        query = "MATCH (i:Item)-[r:PREFERRED_TO_BY]->(j:Item) "
+        query = "MATCH (i)-[r:PREFERRED_TO_BY]->(j) "
         query += f"WHERE i.item_id='{preferred.item_id}' AND j.item_id='{nonpreferred.item_id}' AND r.by='{ranker.ranker_id}' "
         query += "DELETE r"
         db.cypher_query(query)
@@ -198,13 +208,13 @@ def delete_direct_preference(ranker: Ranker, preferred: Item, nonpreferred: Item
 def delete_ranker_knows(ranker: Ranker, item: Item):
     with db.transaction:
         # Delete all direct preferences the ranker has (or has queued) for this item in both directions
-        del_preference_query = "MATCH (i:Item)-[pc:PREFERRED_TO_BY|COMPARE_WITH_BY]-(:Item) "
+        del_preference_query = "MATCH (i:Item)-[pc:PREFERRED_TO_BY|COMPARE_WITH_BY]-() "
         del_preference_query += f"WHERE i.item_id='{item.item_id}' AND pc.by='{ranker.ranker_id}'"
         del_preference_query += "DELETE pc"
         db.cypher_query(del_preference_query)
 
         # Then delete this KNOWS relationship
-        del_preference_query = "MATCH (r:Ranker)-[kdk:KNOWS|DOES_NOT_KNOW]->(i:Item) "
+        del_preference_query = "MATCH (r:Ranker)-[kdk:KNOWS|DOES_NOT_KNOW]->(i) "
         del_preference_query += f"WHERE i.item_id='{item.item_id}' AND r.ranker_id='{ranker.ranker_id}'"
         del_preference_query += "DELETE kdk"
         db.cypher_query(del_preference_query)
@@ -218,8 +228,9 @@ def delete_ranker(ranker: Ranker):
         del_preference_query += f"DELETE pc"
         db.cypher_query(del_preference_query)
 
-        # Delete all KNOWS relationships the ranker has for all items
+        # Delete all KNOWS and DOES_NOT_KNOW relationships the ranker has for all items
         ranker.known_items.disconnect_all()
+        ranker.unknown_items.disconnect_all()
 
         # Then delete the ranker
         ranker.delete()
@@ -236,8 +247,10 @@ def delete_item(item: Item):
         db.cypher_query(del_preference_query)
 
 
-def delete_all_queued_compares(ranker: Ranker):
-    query = "MATCH (:Item)-[c:COMPARE_WITH_BY]-(:Item) "
+def delete_all_queued_compares(ranker: Ranker, item_class):
+    item_labels = ':'.join(item_class.inherited_labels())
+
+    query = f"MATCH (:{item_labels})-[c:COMPARE_WITH_BY]-(:{item_labels}) "
     query += f"WHERE c.by='{ranker.ranker_id}' "
     query += "DELETE c"
     db.cypher_query(query)
