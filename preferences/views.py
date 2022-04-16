@@ -184,8 +184,8 @@ class RankerPairwiseViewSet(GenericViewSet):
         ranker = self.get_ranker()
         preferred, nonpreferred = self.get_items()
         if direct_preference_exists(ranker, preferred, nonpreferred):
-            data = [self.serialize_item(preferred).data,
-                    self.serialize_item(nonpreferred).data]
+            data = {'preferred_id': self.serialize_item(preferred).data,
+                    'nonpreferred_id': self.serialize_item(nonpreferred).data}
             return Response(data=data)
         else:
             return Response(status=status.HTTP_204_NO_CONTENT)

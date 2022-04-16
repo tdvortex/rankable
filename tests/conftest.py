@@ -82,13 +82,6 @@ def authenticated_user_client(bake_user, create_client):
 
     yield create_client(user)
 
-@pytest.fixture
-def admin_user_client(bake_user, create_client):
-    '''Creates an admin user in the database and returns a client authenticated as that user'''
-    user = bake_user(is_staff=True)
-
-    yield create_client(user)
-
 
 @pytest.fixture()
 def setup_neo4j():

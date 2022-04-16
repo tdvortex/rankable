@@ -241,7 +241,7 @@ class TestMoviePrefersList:
         response = client.post(self.url, data, format='json')
 
         assert response.status_code == status.HTTP_201_CREATED
-        assert len(response.data['warnings'])==1
+        assert len(response.data['warnings']) == 1
 
     @pytest.mark.django_db
     def test_if_duplicate_preference_post_returns_201_with_warning(self, setup_neo4j, create_client, bake_user, bake_movie, insert_known_items):
@@ -260,7 +260,7 @@ class TestMoviePrefersList:
         response = client.post(self.url, data, format='json')
 
         assert response.status_code == status.HTTP_201_CREATED
-        assert len(response.data['warnings'])==1
+        assert len(response.data['warnings']) == 1
 
     @pytest.mark.django_db
     def test_if_unknown_movie_post_returns_201_with_warning(self, setup_neo4j, create_client, bake_user, bake_movie, insert_known_items, insert_unknown_items):
@@ -276,9 +276,99 @@ class TestMoviePrefersList:
         # All six pairwise preferences should fail
         data = {'preferences':
                 [{'preferred_id': items[i].item_id, 'nonpreferred_id': items[j].item_id}
-                 for i, j in [(0, 1), (0, 2), (1,2), (2,1), (2,0), (1,0)]]}
+                 for i, j in [(0, 1), (0, 2), (1, 2), (2, 1), (2, 0), (1, 0)]]}
 
         response = client.post(self.url, data, format='json')
 
         assert response.status_code == status.HTTP_201_CREATED
-        assert len(response.data['warnings'])==6
+        assert len(response.data['warnings']) == 6
+
+
+class TestMoviePrefersDetail:
+    url = '/api/movies/preferences/'
+
+    @pytest.mark.django_db
+    def test_if_not_authenticated_get_returns_401(self, api_client, bake_movie):
+        movies = bake_movie(_quantity=2)
+
+        pair_url = self.url + movies[0].id + '/' + movies[1].id + '/'
+        response = api_client.get(pair_url)
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    @pytest.mark.django_db
+    def test_if_either_movie_dne_get_returns_404(self, authenticated_user_client, bake_movie):
+        movie = bake_movie()
+
+        pair_url = self.url + movie.id + '/xxxgarbagexxx/'
+        response = authenticated_user_client.get(pair_url)
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    @pytest.mark.django_db
+    def test_if_preference_exists_get_returns_200(self, setup_neo4j, create_client, bake_user, bake_movie,
+                                              insert_known_items, insert_preferences):
+        user = bake_user()
+        ranker = Ranker.nodes.get(ranker_id=user.id)
+        movies = bake_movie(_quantity=2)
+        items = [Item.nodes.get(item_id=movie.id) for movie in movies]
+        insert_known_items(ranker, items)
+        insert_preferences(ranker, [(items[0], items[1])])
+
+        pair_url = self.url + movies[0].id + '/' + movies[1].id + '/'
+        client = create_client(user)
+        response = client.get(pair_url)
+
+        assert response.status_code == status.HTTP_200_OK
+
+    @pytest.mark.django_db
+    def test_if_preference_dne_get_returns_204(self, setup_neo4j, authenticated_user_client, bake_user, bake_movie):
+        movies = bake_movie(_quantity=2)
+
+        pair_url = self.url + movies[0].id + '/' + movies[1].id + '/'
+        response = authenticated_user_client.get(pair_url)
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    @pytest.mark.django_db
+    def test_if_not_authenticated_delete_returns_401(self, api_client, bake_movie):
+        movies = bake_movie(_quantity=2)
+
+        pair_url = self.url + movies[0].id + '/' + movies[1].id + '/'
+        response = api_client.delete(pair_url)
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    @pytest.mark.django_db
+    def test_if_either_movie_dne_delete_returns_404(self, authenticated_user_client, bake_movie):
+        movie = bake_movie()
+
+        pair_url = self.url + movie.id + '/xxxgarbagexxx/'
+        response = authenticated_user_client.delete(pair_url)
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    @pytest.mark.django_db
+    def test_if_preference_exists_delete_returns_204(self, setup_neo4j, create_client, bake_user, bake_movie,
+                                              insert_known_items, insert_preferences):
+        user = bake_user()
+        ranker = Ranker.nodes.get(ranker_id=user.id)
+        movies = bake_movie(_quantity=2)
+        items = [Item.nodes.get(item_id=movie.id) for movie in movies]
+        insert_known_items(ranker, items)
+        insert_preferences(ranker, [(items[0], items[1])])
+
+        pair_url = self.url + movies[0].id + '/' + movies[1].id + '/'
+        client = create_client(user)
+        response = client.delete(pair_url)
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    @pytest.mark.django_db
+    def test_if_preference_dne_delete_returns_204(self, authenticated_user_client, bake_user, bake_movie):
+        movies = bake_movie(_quantity=2)
+
+        pair_url = self.url + movies[0].id + '/' + movies[1].id + '/'
+        response = authenticated_user_client.delete(pair_url)
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
