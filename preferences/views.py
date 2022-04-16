@@ -1,3 +1,4 @@
+import json
 from django.http import Http404
 from rest_framework.response import Response
 from rest_framework import status
@@ -111,9 +112,9 @@ class RankerKnowsViewSet(GenericViewSet):
         ranker = self.get_ranker()
         try:
             known_items = [Item.nodes.get(item_id=i)
-                               for i in self.request.data.getlist('known_ids')]
+                           for i in self.request.data['known_ids']]
             unknown_items = [Item.nodes.get(item_id=i)
-                                 for i in self.request.data.getlist('unknown_ids')]
+                             for i in self.request.data['unknown_ids']]
         except DoesNotExist:
             raise Http404
 
@@ -193,8 +194,9 @@ class RankerPairwiseViewSet(GenericViewSet):
         ranker = self.get_ranker()
 
         try:
-            preferences = [(Item.nodes.get(item_id=i), Item.nodes.get(item_id=j))
-                               for i,j in self.request.data['preferences']]
+            preferences = [(Item.nodes.get(item_id=preference['preferred_id']),
+                            Item.nodes.get(item_id=preference['nonpreferred_id']))
+                           for preference in self.request.data['preferences']]
         except DoesNotExist:
             raise Http404
 

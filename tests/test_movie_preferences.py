@@ -1,3 +1,4 @@
+import json
 import pytest
 from rest_framework import status
 from preferences.models import Item, Ranker
@@ -10,20 +11,22 @@ class TestMovieDiscover:
         response = api_client.get(self.url)
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
-    
+
     @pytest.mark.django_db
     def test_if_authenticated_get_returns_200(self, user_client_with_movie_preferences):
         response = user_client_with_movie_preferences.get(self.url)
 
         assert response.status_code == status.HTTP_200_OK
 
+
 class TestMovieKnowsList:
     url = '/api/movies/knows/'
+
     def test_if_not_authenticated_get_returns_401(self, api_client):
         response = api_client.get(self.url)
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
-    
+
     @pytest.mark.django_db
     def test_if_authenticated_get_returns_200(self, authenticated_user_client):
         response = authenticated_user_client.get(self.url)
@@ -31,7 +34,7 @@ class TestMovieKnowsList:
         assert response.status_code == status.HTTP_200_OK
 
     def test_if_not_authenticated_post_returns_401(self, api_client):
-        response = api_client.post(self.url, {})
+        response = api_client.post(self.url, {}, format='json')
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
@@ -45,12 +48,15 @@ class TestMovieKnowsList:
 
         data = {'known_ids': known_movie_ids, 'unknown_ids': unknown_movie_ids}
 
-        response = authenticated_user_client.post(self.url, data)
+        response = authenticated_user_client.post(
+            self.url, data, format='json')
 
         assert response.status_code == status.HTTP_201_CREATED
 
+
 class TestMovieKnowsDetail:
     url = '/api/movies/knows/'
+
     def test_if_not_authenticated_get_returns_401(self, api_client):
         response = api_client.get(self.url + 'xxxgarbagexxx/')
 
@@ -72,12 +78,12 @@ class TestMovieKnowsDetail:
 
         insert_known_items(ranker, [item])
         client = create_client(user)
-        
+
         response = client.get(self.url + movie.id + '/')
 
         assert response.status_code == status.HTTP_200_OK
         assert response.data['knows'] == True
-        
+
     @pytest.mark.django_db
     def test_if_does_not_know_get_returns_200_and_false(self, setup_neo4j, create_client, bake_user, bake_movie, insert_unknown_items):
         user = bake_user()
@@ -88,7 +94,7 @@ class TestMovieKnowsDetail:
 
         insert_unknown_items(ranker, [item])
         client = create_client(user)
-        
+
         response = client.get(self.url + movie.id + '/')
 
         assert response.status_code == status.HTTP_200_OK
@@ -101,7 +107,7 @@ class TestMovieKnowsDetail:
         movie = bake_movie()
 
         client = create_client(user)
-        
+
         response = client.get(self.url + movie.id + '/')
 
         assert response.status_code == status.HTTP_200_OK
@@ -122,10 +128,11 @@ class TestMovieKnowsDetail:
 
         insert_known_items(ranker, [item])
         client = create_client(user)
-        
+
         response = client.delete(self.url + movie.id + '/')
 
         assert response.status_code == status.HTTP_200_OK
+
 
 class TestMovieSort():
     url = '/api/movies/sort/'
@@ -141,7 +148,8 @@ class TestMovieSort():
 
         assert response.status_code == status.HTTP_200_OK
 
-class TestMovieQueue():
+
+class TestMovieQueue:
     url = '/api/movies/queue/'
 
     def test_if_not_authenticated_get_returns_401(self, api_client):
@@ -176,3 +184,101 @@ class TestMovieQueue():
         response = user_client_with_movie_preferences.delete(self.url)
 
         assert response.status_code == status.HTTP_204_NO_CONTENT
+
+
+class TestMoviePrefersList:
+    url = '/api/movies/preferences/'
+
+    def test_if_not_authenticated_get_returns_401(self, api_client):
+        response = api_client.get(self.url)
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    @pytest.mark.django_db
+    def test_if_authenticated_get_returns_200(self, user_client_with_movie_preferences):
+        response = user_client_with_movie_preferences.get(self.url)
+
+        assert response.status_code == status.HTTP_200_OK
+
+    def test_if_not_authenticated_post_returns_401(self, api_client):
+        response = api_client.post(self.url)
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    @pytest.mark.django_db
+    def test_if_good_preferences_post_returns_201_no_warnings(self, setup_neo4j, create_client, bake_user, bake_movie, insert_known_items):
+        user = bake_user()
+        ranker = Ranker.nodes.get(ranker_id=user.id)
+        movies = bake_movie(_quantity=3)
+        items = [Item.nodes.get(item_id=movie.id) for movie in movies]
+        insert_known_items(ranker, items)
+        client = create_client(user)
+
+        # A->B->C and A->C
+        data = {'preferences':
+                [{'preferred_id': items[i].item_id, 'nonpreferred_id': items[j].item_id}
+                 for i, j in [(0, 1), (1, 2), (0, 2)]]}
+
+        response = client.post(self.url, data, format='json')
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert 'warnings' not in response.data
+
+    @pytest.mark.django_db
+    def test_if_cyclic_preference_post_returns_201_with_warning(self, setup_neo4j, create_client, bake_user, bake_movie, insert_known_items):
+        user = bake_user()
+        ranker = Ranker.nodes.get(ranker_id=user.id)
+        movies = bake_movie(_quantity=3)
+        items = [Item.nodes.get(item_id=movie.id) for movie in movies]
+        insert_known_items(ranker, items)
+        client = create_client(user)
+
+        # A->B->C->A
+        data = {'preferences':
+                [{'preferred_id': items[i].item_id, 'nonpreferred_id': items[j].item_id}
+                 for i, j in [(0, 1), (1, 2), (2, 1)]]}
+
+        response = client.post(self.url, data, format='json')
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert len(response.data['warnings'])==1
+
+    @pytest.mark.django_db
+    def test_if_duplicate_preference_post_returns_201_with_warning(self, setup_neo4j, create_client, bake_user, bake_movie, insert_known_items):
+        user = bake_user()
+        ranker = Ranker.nodes.get(ranker_id=user.id)
+        movies = bake_movie(_quantity=2)
+        items = [Item.nodes.get(item_id=movie.id) for movie in movies]
+        insert_known_items(ranker, items)
+        client = create_client(user)
+
+        # A->B twice
+        data = {'preferences':
+                [{'preferred_id': items[i].item_id, 'nonpreferred_id': items[j].item_id}
+                 for i, j in [(0, 1), (0, 1)]]}
+
+        response = client.post(self.url, data, format='json')
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert len(response.data['warnings'])==1
+
+    @pytest.mark.django_db
+    def test_if_unknown_movie_post_returns_201_with_warning(self, setup_neo4j, create_client, bake_user, bake_movie, insert_known_items, insert_unknown_items):
+        user = bake_user()
+        ranker = Ranker.nodes.get(ranker_id=user.id)
+        movies = bake_movie(_quantity=3)
+        items = [Item.nodes.get(item_id=movie.id) for movie in movies]
+        insert_known_items(ranker, [items[0]])
+        insert_unknown_items(ranker, [items[2]])
+        client = create_client(user)
+
+        # User knows A, hasn't marked B, and has marked C as unknown
+        # All six pairwise preferences should fail
+        data = {'preferences':
+                [{'preferred_id': items[i].item_id, 'nonpreferred_id': items[j].item_id}
+                 for i, j in [(0, 1), (0, 2), (1,2), (2,1), (2,0), (1,0)]]}
+
+        response = client.post(self.url, data, format='json')
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert len(response.data['warnings'])==6

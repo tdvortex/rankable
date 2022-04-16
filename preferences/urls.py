@@ -16,10 +16,10 @@ urlpatterns = [
                                            'delete': 'destroy'})),
     path('discover/',
          views.RankerKnowsViewSet.as_view({'get': 'discover'})),
-    path('prefers/',
+    path('preferences/',
          views.RankerPairwiseViewSet.as_view({'get': 'list',
                                               'post': 'create'})),
-    path('prefers/<str:preferred_id>/<str:nonpreferred_id>/',
+    path('preferences/<str:preferred_id>/<str:nonpreferred_id>/',
          views.RankerPairwiseViewSet.as_view({'get': 'retrieve',
                                               'delete': 'destroy'})),
 ]

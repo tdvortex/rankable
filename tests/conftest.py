@@ -97,7 +97,7 @@ def setup_neo4j():
     yield
 
     remove_all_labels()
-    clear_neo4j_database
+    clear_neo4j_database(db)
 
 @pytest.fixture()
 def insert_known_items():
