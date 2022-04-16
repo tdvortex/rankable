@@ -30,14 +30,29 @@ class TestMovieKnowsList:
 
         assert response.status_code == status.HTTP_200_OK
 
+    def test_if_not_authenticated_post_returns_401(self, api_client):
+        response = api_client.post(self.url, {})
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    @pytest.mark.django_db
+    def test_if_authenticated_post_returns_201(self, authenticated_user_client, bake_movie):
+        known_movies = bake_movie(_quantity=2)
+        unknown_movies = bake_movie(_quantity=2)
+
+        known_movie_ids = [movie.id for movie in known_movies]
+        unknown_movie_ids = [movie.id for movie in unknown_movies]
+
+        data = {'known_ids': known_movie_ids, 'unknown_ids': unknown_movie_ids}
+
+        response = authenticated_user_client.post(self.url, data)
+
+        assert response.status_code == status.HTTP_201_CREATED
 
 class TestMovieKnowsDetail:
     url = '/api/movies/knows/'
-    @pytest.mark.django_db
-    def test_if_not_authenticated_get_returns_401(self, api_client, bake_movie):
-        movie = bake_movie()
-
-        response = api_client.get(self.url + movie.id + '/')
+    def test_if_not_authenticated_get_returns_401(self, api_client):
+        response = api_client.get(self.url + 'xxxgarbagexxx/')
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
@@ -48,7 +63,7 @@ class TestMovieKnowsDetail:
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     @pytest.mark.django_db
-    def test_if_knows_get_returns_200_and_true(self, setup_neo4j_labels, create_client, bake_user, bake_movie, insert_known_items):
+    def test_if_knows_get_returns_200_and_true(self, setup_neo4j, create_client, bake_user, bake_movie, insert_known_items):
         user = bake_user()
         ranker: Ranker = Ranker.nodes.get(ranker_id=user.id)
 
@@ -64,7 +79,7 @@ class TestMovieKnowsDetail:
         assert response.data['knows'] == True
         
     @pytest.mark.django_db
-    def test_if_does_not_know_get_returns_200_and_false(self, setup_neo4j_labels, create_client, bake_user, bake_movie, insert_unknown_items):
+    def test_if_does_not_know_get_returns_200_and_false(self, setup_neo4j, create_client, bake_user, bake_movie, insert_unknown_items):
         user = bake_user()
         ranker: Ranker = Ranker.nodes.get(ranker_id=user.id)
 
@@ -80,7 +95,7 @@ class TestMovieKnowsDetail:
         assert response.data['knows'] == False
 
     @pytest.mark.django_db
-    def test_if_unstated_get_returns_200_and_undefined(self, setup_neo4j_labels, create_client, bake_user, bake_movie):
+    def test_if_unstated_get_returns_200_and_undefined(self, setup_neo4j, create_client, bake_user, bake_movie):
         user = bake_user()
 
         movie = bake_movie()
@@ -91,3 +106,73 @@ class TestMovieKnowsDetail:
 
         assert response.status_code == status.HTTP_200_OK
         assert response.data['knows'] == 'undefined'
+
+    def test_if_not_authenticated_delete_returns_401(self, api_client):
+        response = api_client.delete(self.url + 'xxxgarbagexxx/')
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    @pytest.mark.django_db
+    def test_if_authenticated_delete_returns_200(self, setup_neo4j, create_client, bake_user, bake_movie, insert_known_items):
+        user = bake_user()
+        ranker: Ranker = Ranker.nodes.get(ranker_id=user.id)
+
+        movie = bake_movie()
+        item: Item = Item.nodes.get(item_id=movie.id)
+
+        insert_known_items(ranker, [item])
+        client = create_client(user)
+        
+        response = client.delete(self.url + movie.id + '/')
+
+        assert response.status_code == status.HTTP_200_OK
+
+class TestMovieSort():
+    url = '/api/movies/sort/'
+
+    def test_if_not_authenticated_get_returns_401(self, api_client):
+        response = api_client.get(self.url)
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    @pytest.mark.django_db
+    def test_if_authenticated_get_returns_200(self, user_client_with_movie_preferences):
+        response = user_client_with_movie_preferences.get(self.url)
+
+        assert response.status_code == status.HTTP_200_OK
+
+class TestMovieQueue():
+    url = '/api/movies/queue/'
+
+    def test_if_not_authenticated_get_returns_401(self, api_client):
+        response = api_client.get(self.url)
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    @pytest.mark.django_db
+    def test_if_authenticated_get_returns_200(self, user_client_with_movie_preferences):
+        response = user_client_with_movie_preferences.get(self.url)
+
+        assert response.status_code == status.HTTP_200_OK
+
+    def test_if_not_authenticated_post_returns_401(self, api_client):
+        response = api_client.post(self.url)
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    @pytest.mark.django_db
+    def test_if_authenticated_post_returns_201(self, user_client_with_movie_preferences):
+        response = user_client_with_movie_preferences.post(self.url)
+
+        assert response.status_code == status.HTTP_201_CREATED
+
+    def test_if_not_authenticated_delete_returns_401(self, api_client):
+        response = api_client.delete(self.url)
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    @pytest.mark.django_db
+    def test_if_authenticated_delete_returns_204(self, user_client_with_movie_preferences):
+        response = user_client_with_movie_preferences.delete(self.url)
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT

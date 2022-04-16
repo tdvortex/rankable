@@ -110,16 +110,16 @@ class RankerKnowsViewSet(GenericViewSet):
     def create(self, request, *args, **kwargs):
         ranker = self.get_ranker()
         try:
-            new_known_items = [Item.nodes.get(item_id=i)
-                               for i in self.request.data['new_known_ids']]
-            new_unknown_items = [Item.nodes.get(item_id=i)
-                                 for i in self.request.data['new_unknown_ids']]
+            known_items = [Item.nodes.get(item_id=i)
+                               for i in self.request.data.getlist('known_ids')]
+            unknown_items = [Item.nodes.get(item_id=i)
+                                 for i in self.request.data.getlist('unknown_ids')]
         except DoesNotExist:
             raise Http404
 
         insert_ranker_knows(ranker,
-                            new_known_items=new_known_items,
-                            new_unknown_items=new_unknown_items)
+                            known_items=known_items,
+                            unknown_items=unknown_items)
 
         return Response(status=status.HTTP_201_CREATED)
 
@@ -193,12 +193,12 @@ class RankerPairwiseViewSet(GenericViewSet):
         ranker = self.get_ranker()
 
         try:
-            new_preferences = [(Item.nodes.get(item_id=i), Item.nodes.get(item_id=j))
-                               for i,j in self.request.data['new_preference_ids']]
+            preferences = [(Item.nodes.get(item_id=i), Item.nodes.get(item_id=j))
+                               for i,j in self.request.data['preferences']]
         except DoesNotExist:
             raise Http404
 
-        warnings = insert_preferences(ranker, new_preferences)
+        warnings = insert_preferences(ranker, preferences)
 
         data = {'warnings': warnings} if warnings else {}
 

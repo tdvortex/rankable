@@ -1,7 +1,7 @@
 import pytest
 from django.contrib.auth.hashers import make_password
 from rest_framework.test import APIClient
-from neomodel import db, install_all_labels, remove_all_labels
+from neomodel import db, install_all_labels, remove_all_labels, clear_neo4j_database
 from model_bakery import baker
 from users.models import User
 from movies.models import Movie
@@ -91,12 +91,13 @@ def admin_user_client(bake_user, create_client):
 
 
 @pytest.fixture()
-def setup_neo4j_labels():
+def setup_neo4j():
     install_all_labels()
 
     yield
 
     remove_all_labels()
+    clear_neo4j_database
 
 @pytest.fixture()
 def insert_known_items():
@@ -170,7 +171,7 @@ def insert_queued_compares():
         db.cypher_query(query)
 
 @pytest.fixture
-def user_with_movie_preferences(setup_neo4j_labels, bake_user, bake_movie, insert_known_items, insert_unknown_items, insert_preferences, insert_queued_compares):
+def user_with_movie_preferences(setup_neo4j, bake_user, bake_movie, insert_known_items, insert_unknown_items, insert_preferences, insert_queued_compares):
     # Baking movies and users should automatically populate the test database with those nodes
     user = bake_user()
     movies = bake_movie(_quantity=7)

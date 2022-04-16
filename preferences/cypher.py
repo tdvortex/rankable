@@ -32,43 +32,43 @@ def queued_preference_may_exist(ranker: Ranker, preferred: Item, nonpreferred: I
     return results[0][0]
 
 # Create operations
-def insert_ranker_knows(ranker: Ranker, new_known_items: list[Item], new_unknown_items: list[Item]):   
-    if new_known_items:
+def insert_ranker_knows(ranker: Ranker, known_items: list[Item], unknown_items: list[Item]):   
+    if known_items:
         with db.transaction:
             # Remove that they do not know each item
             query = "MATCH (r:Ranker)-[d:DOES_NOT_KNOW]->(i:Item) "
             query += f"WHERE r.ranker_id='{ranker.ranker_id}' "
-            query += f"AND i.item_id IN {[item.item_id for item in new_known_items]} "
+            query += f"AND i.item_id IN {[item.item_id for item in known_items]} "
             query += f"DELETE d"
             db.cypher_query(query)
 
             # Add that they do know each item
             query = "MATCH (r:Ranker), (i:Item) "
             query += f"WHERE r.ranker_id='{ranker.ranker_id}' "
-            query += f"AND i.item_id IN {[item.item_id for item in new_known_items]} "
+            query += f"AND i.item_id IN {[item.item_id for item in known_items]} "
             query += f"MERGE (r)-[:KNOWS]->(i)"
             db.cypher_query(query)
 
-    if new_unknown_items:
+    if unknown_items:
         with db.transaction:
             # Delete any existing preferences or queued comparisons
             query = "MATCH (i:Item)-[pc:PREFERRED_TO_BY|COMPARE_WITH_BY]-(:Item) "
             query += f"WHERE pc.by='{ranker.ranker_id}' "
-            query += f"AND i.item_id IN {[item.item_id for item in new_unknown_items]} "
+            query += f"AND i.item_id IN {[item.item_id for item in unknown_items]} "
             query += f"DELETE pc"
             db.cypher_query(query)
 
             # Remove that they know each item
             query = "MATCH (r:Ranker)-[d:KNOWS]->(i:Item) "
             query += f"WHERE r.ranker_id='{ranker.ranker_id}' "
-            query += f"AND i.item_id IN {[item.item_id for item in new_unknown_items]} "
+            query += f"AND i.item_id IN {[item.item_id for item in unknown_items]} "
             query += f"DELETE d"
             db.cypher_query(query)
 
             # Add that they do not know each item
             query = "MATCH (r:Ranker), (i:Item) "
             query += f"WHERE r.ranker_id='{ranker.ranker_id}' "
-            query += f"AND i.item_id IN {[item.item_id for item in new_unknown_items]} "
+            query += f"AND i.item_id IN {[item.item_id for item in unknown_items]} "
             query += f"MERGE (r)-[:DOES_NOT_KNOW]->(i)"
             db.cypher_query(query)
 
