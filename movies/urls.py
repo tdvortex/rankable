@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from . import views
 
 router = DefaultRouter()
-router.register('', views.MovieViewSet)
+router.register('info', views.MovieViewSet)
 
 urlpatterns = [
     path('populate/', views.populate_movies)

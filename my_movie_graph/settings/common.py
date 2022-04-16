@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     'debug_toolbar',
     'rest_framework',
     'djoser',
+    'django_neomodel',
     'users',
     'movies',
     'preferences',
@@ -131,3 +132,5 @@ DJOSER = {
         'current_user': 'users.serializers.UserSerializer',
     }
 }
+
+RANKED_ITEM_MODEL = 'movies.Movie'

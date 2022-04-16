@@ -1,4 +1,3 @@
-from cgi import test
 import pytest
 from rest_framework import status
 from movies.models import Movie
@@ -9,7 +8,7 @@ class TestListMovies:
     def test_returns_all_movies_and_200(self, api_client, bake_movie):
         bake_movie(_quantity=2)
 
-        response = api_client.get('/api/movies/')
+        response = api_client.get('/api/movies/info/')
 
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data['results']) == 2
@@ -18,7 +17,7 @@ class TestListMovies:
 @pytest.fixture
 def retrieve_movie(api_client):
     def do_retrieve_movie(id):
-        return api_client.get('/api/movies/{}/'.format(id))
+        return api_client.get('/api/movies/info/{}/'.format(id))
     return do_retrieve_movie
 
 
@@ -41,7 +40,7 @@ class TestRetrieveMovie:
 @pytest.fixture
 def search_movie(api_client):
     def do_search_movie(q):
-        return api_client.get('/api/movies/search/?q={}'.format(q))
+        return api_client.get('/api/movies/info/search/?q={}'.format(q))
     return do_search_movie
 
 
