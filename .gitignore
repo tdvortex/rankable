@@ -50,6 +50,7 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+cov.xml
 
 # Translations
 *.mo
@@ -127,3 +128,8 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+.vscode
+.mmg_pass
+.apikey
+.imdb/

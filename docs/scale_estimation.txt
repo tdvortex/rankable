@@ -1,0 +1,45 @@
+Unique movies: 100k
+    Movie poster average size: 500KB
+        Image storage: 500KB x 100k = 50 GB
+    Additional movie metadata: 1KB per movie (including indexing for search)
+        Metadata storage: 100MB
+
+Unique users: 1M total users, 100k DAU
+User data: about 1KB per user
+    User data storage: 1 GB for user data
+
+User/movie data:
+    1000 seen, 1000 unseen movies per user
+    25 bytes per seen record (user ID, preferred movie ID)
+
+    1000 seen movies = up to 1M preferences per user, about 10,000 for NlogN sort
+    Estimate: 2,000 recorded preferences per user
+    About 50 bytes per preference (user id, preferred movie ID), not-preferred movie ID)
+
+    User/movie data storage:
+        50 bytes preference * 2000 preferences per user * 1M total users 
+        + 25 bytes * 2000 movies per user * 1M total users
+        = 150GB preference data
+
+        75% utilization = 200GB total data
+
+Activity:
+    1 new seen, 1 new unseen movie per day per DAU = + 50MB/day
+    100 new preferences per DAU per day = +500 MB/day
+        New storage needs = +550MB/day
+        Incoming data bandwidth = 6.3 Kbps
+    
+    200 movie poster views per DAU per day = 10 TB/day
+        = 116 Mbps outgoing
+
+Caching:
+    Top 20% of movie posters = 10 GB of cache
+    Caching 1 DAU's preference data = 300KB/user 
+        x100k DAU = 30GB of cache
+
+
+Observations:
+    Largest data capacity need = user preference data, but unlikely to ever require specialized tools
+    Largest bandwidth usage = movie posters
+
+    Most active users likely to use substantially higher bandwidth and storage than less active users
