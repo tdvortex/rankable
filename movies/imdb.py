@@ -8,7 +8,7 @@ from .models import Movie, Star, Genre
 
 def do_populate_movies():
     if settings.DEBUG:
-        f = open('.apikey', 'r')
+        f = open('.imdb_apikey', 'r')
         key = f.read()
         f.close()
     else:
