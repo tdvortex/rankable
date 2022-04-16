@@ -22,7 +22,7 @@ DATABASES = {
         'HOST': 'localhost',
         'PORT': 5432,
         'OPTIONS': {
-            'passfile': '.mmg_pass'
+            'passfile': '.sql_pass'
         }
     }
 }
