@@ -52,7 +52,6 @@ class RankerViewSet(GenericViewSet):
 
     def reset_comparisons_queue(self, request, *args, **kwargs):
         ranker = self.get_object()
-        delete_all_queued_compares(ranker, self.item_class)
         populate_queued_compares(ranker, self.item_class)
         data = [[self.serialize_item(i).data, self.serialize_item(j).data]
                 for i, j in list_queued_compares(ranker, self.item_class)]

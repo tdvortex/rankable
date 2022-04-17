@@ -144,7 +144,7 @@ def list_queued_compares(ranker: Ranker, item_class, limit=None):
     return output
 
 
-def get_random_possible_queued_compares(ranker: Ranker, item_class, limit=100):
+def get_random_possible_queued_compares(ranker: Ranker, item_class, limit=10):
     item_labels = ':'.join(item_class.inherited_labels())
 
     query = f"MATCH (i:{item_labels})<-[:KNOWS]-(u)-[:KNOWS]->(j:{item_labels}) "
@@ -163,7 +163,7 @@ def get_random_possible_queued_compares(ranker: Ranker, item_class, limit=100):
     return [(item_class.inflate(row[0]), item_class.inflate(row[1])) for row in results]
 
 
-def populate_queued_compares(ranker: Ranker, item_class, max_created=100):
+def populate_queued_compares(ranker: Ranker, item_class, max_created=10):
     created = 0
     to_attempt = get_random_possible_queued_compares(ranker, item_class, limit=max_created)
 
