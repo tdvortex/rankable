@@ -244,25 +244,6 @@ class TestMoviePrefersList:
         assert len(response.data['warnings']) == 1
 
     @pytest.mark.django_db
-    def test_if_duplicate_preference_post_returns_201_with_warning(self, setup_neo4j, create_client, bake_user, bake_movie, insert_known_items):
-        user = bake_user()
-        ranker = Ranker.nodes.get(ranker_id=user.id)
-        movies = bake_movie(_quantity=2)
-        items = [Item.nodes.get(item_id=movie.id) for movie in movies]
-        insert_known_items(ranker, items)
-        client = create_client(user)
-
-        # A->B twice
-        data = {'preferences':
-                [{'preferred_id': items[i].item_id, 'nonpreferred_id': items[j].item_id}
-                 for i, j in [(0, 1), (0, 1)]]}
-
-        response = client.post(self.url, data, format='json')
-
-        assert response.status_code == status.HTTP_201_CREATED
-        assert len(response.data['warnings']) == 1
-
-    @pytest.mark.django_db
     def test_if_unknown_movie_post_returns_201_with_warning(self, setup_neo4j, create_client, bake_user, bake_movie, insert_known_items, insert_unknown_items):
         user = bake_user()
         ranker = Ranker.nodes.get(ranker_id=user.id)

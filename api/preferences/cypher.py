@@ -1,3 +1,4 @@
+from random import sample
 from .models import Item, Ranker
 from neomodel import db
 
@@ -11,39 +12,19 @@ def ranker_does_not_know_item(ranker: Ranker, item: Item) -> bool:
 def direct_preference_exists(ranker: Ranker, preferred: Item, nonpreferred: Item):
     return nonpreferred in preferred.preferred_to_items.match(by=ranker.ranker_id)
 
-def indirect_preference_exists(ranker: Ranker, preferred: Item, nonpreferred: Item):
-    query = "MATCH p=(i:Item)-[r:PREFERRED_TO_BY*]->(j:Item) "
-    query += f"WHERE i.item_id='{preferred.item_id}' AND j.item_id='{nonpreferred.item_id}' "
-    query += f"AND all(r in relationships(p) WHERE r.by='{ranker.ranker_id}') "
-    query += "RETURN count(p)>0"
-
-    results, _ = db.cypher_query(query)
-    return results[0][0]
-
-
-def queued_preference_may_exist(ranker: Ranker, preferred: Item, nonpreferred: Item):
-    # Check if an indirect preference exists or might exist after all queued comparisons are resolved
-    query = "MATCH p=(i:Item)-[r:PREFERRED_TO_BY|COMPARE_WITH_BY*]->(j:Item) "
-    query += f"WHERE i.item_id='{preferred.item_id}' AND j.item_id='{nonpreferred.item_id}' "
-    query += f"AND all(r in relationships(p) WHERE r.by='{ranker.ranker_id}') "
-    query += "RETURN count(p)>0"
-
-    results, _ = db.cypher_query(query)
-    return results[0][0]
-
 # Create operations
 def insert_ranker_knows(ranker: Ranker, known_items: list[Item], unknown_items: list[Item]):   
     if known_items:
         with db.transaction:
             # Remove that they do not know each item
-            query = "MATCH (r:Ranker)-[d:DOES_NOT_KNOW]->(i:Item) "
+            query = "MATCH (r)-[d:DOES_NOT_KNOW]->(i) "
             query += f"WHERE r.ranker_id='{ranker.ranker_id}' "
             query += f"AND i.item_id IN {[item.item_id for item in known_items]} "
             query += f"DELETE d"
             db.cypher_query(query)
 
             # Add that they do know each item
-            query = "MATCH (r:Ranker), (i:Item) "
+            query = "MATCH (r), (i) "
             query += f"WHERE r.ranker_id='{ranker.ranker_id}' "
             query += f"AND i.item_id IN {[item.item_id for item in known_items]} "
             query += f"MERGE (r)-[:KNOWS]->(i)"
@@ -52,24 +33,24 @@ def insert_ranker_knows(ranker: Ranker, known_items: list[Item], unknown_items: 
     if unknown_items:
         with db.transaction:
             # Delete any existing preferences or queued comparisons
-            query = "MATCH (i:Item)-[pc:PREFERRED_TO_BY|COMPARE_WITH_BY]-(:Item) "
+            query = "MATCH (i)-[pc:PREFERRED_TO_BY|COMPARE_WITH_BY]-() "
             query += f"WHERE pc.by='{ranker.ranker_id}' "
             query += f"AND i.item_id IN {[item.item_id for item in unknown_items]} "
             query += f"DELETE pc"
             db.cypher_query(query)
 
             # Remove that they know each item
-            query = "MATCH (r:Ranker)-[d:KNOWS]->(i:Item) "
+            query = "MATCH (r)-[k:KNOWS]->(i) "
             query += f"WHERE r.ranker_id='{ranker.ranker_id}' "
             query += f"AND i.item_id IN {[item.item_id for item in unknown_items]} "
-            query += f"DELETE d"
+            query += f"DELETE k"
             db.cypher_query(query)
 
             # Add that they do not know each item
-            query = "MATCH (r:Ranker), (i:Item) "
+            query = "MATCH (r), (i) "
             query += f"WHERE r.ranker_id='{ranker.ranker_id}' "
             query += f"AND i.item_id IN {[item.item_id for item in unknown_items]} "
-            query += f"MERGE (r)-[:DOES_NOT_KNOW]->(i)"
+            query += f"MERGE (r)-[:DOES_NOT_KNOW]->(i)"            
             db.cypher_query(query)
 
 def insert_preferences(ranker: Ranker, new_preferences: list[tuple[Item,Item]]):
@@ -78,43 +59,43 @@ def insert_preferences(ranker: Ranker, new_preferences: list[tuple[Item,Item]]):
     for preferred, nonpreferred in new_preferences:
         with db.transaction:
             # If this preference were a queued comparison, we remove that comparison from the queue
-            query = "MATCH (i:Item)-[r:COMPARE_WITH_BY]-(j:Item) "
+            # We delete this comparison even if the preference is invalid (so that invalid comparisons are no longer queued)
+            query = "MATCH (i)-[r:COMPARE_WITH_BY]-(j) "
             query += f"WHERE i.item_id='{preferred.item_id}' AND j.item_id='{nonpreferred.item_id}' AND r.by='{ranker.ranker_id}' "
             query += "DELETE r"
             db.cypher_query(query)
 
-            if not ranker_knows_item(ranker, preferred):
-                warnings.append(f'Item {preferred.item_id} is not known')
-            elif not ranker_knows_item(ranker, nonpreferred):
-                warnings.append(f'Item {nonpreferred.item_id} is not known')
-            elif indirect_preference_exists(ranker, preferred=nonpreferred, nonpreferred=preferred):
-                # Preference must not violate existing preferences and create a cycle
-                warnings.append(f'Cannot create cyclic preference for {preferred.item_id}, {nonpreferred.item_id}')
-            elif direct_preference_exists(ranker, preferred, nonpreferred):
-                warnings.append(f'Preference already exists for {preferred.item_id}, {nonpreferred.item_id}')
-            else:
-                preferred.preferred_to_items.connect(nonpreferred,
-                                                    {'by': ranker.ranker_id})
+            query = "MATCH (i), (u), (j) "
+            query += f"WHERE (i.item_id='{preferred.item_id}') AND (u.ranker_id='{ranker.ranker_id}') AND (j.item_id='{nonpreferred.item_id}') "
+            query += "AND EXISTS((i)<-[:KNOWS]-(u)-[:KNOWS]->(j))"
+            query += f"AND NOT EXISTS((i)<-[:PREFERRED_TO_BY* {{by:'{ranker.ranker_id}'}}]-(j)) "
+            query += f"MERGE (i)-[:PREFERRED_TO_BY {{by:'{ranker.ranker_id}'}}]->(j)"
+            query += f"RETURN size((i)-[:PREFERRED_TO_BY {{by:'{ranker.ranker_id}'}}]->(j))=1"
+            results, _ = db.cypher_query(query)
+            if not results or not results[0][0]:
+                warnings.append(f'Cound not insert preference {preferred.item_id}, {nonpreferred.item_id}')
     
     return warnings
 
 
-def insert_queued_compare(ranker: Ranker, left: Item, right: Item):
-    with db.transaction:
-        if not ranker_knows_item(ranker, left) or not ranker_knows_item(ranker, right):
-            # Ranker must know both items to be have a preference
-            return False
+def insert_queued_compares(ranker: Ranker, new_queued: list[tuple[Item,Item]]):
+    inserted_count = 0
 
-        if (queued_preference_may_exist(ranker, preferred=left, nonpreferred=right)
-                or queued_preference_may_exist(ranker, preferred=right, nonpreferred=left)):
-            # Comparison must not be able to violate existing preferences and create a cycle
-            return False
-
-        # Insert in both directions so that traversal paths work either way
-        left.queued_compares.connect(right, {'by': ranker.ranker_id})
-        right.queued_compares.connect(left, {'by': ranker.ranker_id})
-        return True
-
+    for left, right in new_queued:
+        query = "MATCH (i), (u), (j) "
+        query += f"WHERE (i.item_id='{left.item_id}') AND (u.ranker_id='{ranker.ranker_id}') AND (j.item_id='{right.item_id}') "
+        query += "AND EXISTS((i)<-[:KNOWS]-(u)-[:KNOWS]->(j))"
+        query += f"AND NOT EXISTS((i)-[:PREFERRED_TO_BY|COMPARE_WITH_BY* {{by:'{ranker.ranker_id}'}}]->(j)) "
+        query += f"AND NOT EXISTS((i)<-[:PREFERRED_TO_BY|COMPARE_WITH_BY* {{by:'{ranker.ranker_id}'}}]-(j)) "
+        query += f"MERGE (i)-[:COMPARE_WITH_BY {{by:'{ranker.ranker_id}'}}]->(j) "
+        query += f"MERGE (i)<-[:COMPARE_WITH_BY {{by:'{ranker.ranker_id}'}}]-(j) "
+        query += f"RETURN size((i)-[:COMPARE_WITH_BY {{by:'{ranker.ranker_id}'}}]-(j))=2"
+        results, _ = db.cypher_query(query)
+        if results and results[0][0]:
+            inserted_count += 1
+    
+    return inserted_count
+       
 
 # Retrieve operations
 def get_direct_preferences(ranker: Ranker, item_class) -> list[tuple[Item, Item]]:
@@ -139,55 +120,68 @@ def topological_sort(ranker: Ranker, item_class):
     return [item_class.inflate(row[0]) for row in results]
 
 
-def list_queued_compares(ranker: Ranker, item_class):
+def list_queued_compares(ranker: Ranker, item_class, limit=None):
     item_labels = ':'.join(item_class.inherited_labels())
 
     # Get any existing comparisons to be made
-    query = f"MATCH (i:{item_labels})-[r:COMPARE_WITH_BY]->(j:{item_labels}) "
+    query = f"MATCH (u)-[:KNOWS]->(i:{item_labels})-[r:COMPARE_WITH_BY]->(j:{item_labels})<-[:KNOWS]-(u) "
     query += f"WHERE r.by='{ranker.ranker_id}' "
-    query += f"AND id(i) < id(j) "
+    query += f"AND id(i) < id(j) "  # Don't double-count
     query += "RETURN i,j"
+
+    # Limit if needed
+    if limit is not None:
+        query += f" LIMIT {limit}"
+
+    results, _ = db.cypher_query(query)
+
+    # Present each comparison in a random order
+    output = []
+    for row in results:
+        left, right = item_class.inflate(row[0]), item_class.inflate(row[1])
+        pair = sample([left, right],2)
+        output.append(tuple(pair))
+    return output
+
+
+def get_random_possible_queued_compares(ranker: Ranker, item_class, limit=100):
+    item_labels = ':'.join(item_class.inherited_labels())
+
+    query = f"MATCH (i:{item_labels})<-[:KNOWS]-(u)-[:KNOWS]->(j:{item_labels}) "
+    query += f"WHERE u.ranker_id='{ranker.ranker_id}' "
+    query += "AND id(i) < id(j) "
+    query += f"AND NOT EXISTS((i)-[:PREFERRED_TO_BY|COMPARE_WITH_BY* {{by:'{ranker.ranker_id}'}}]->(j)) "
+    query += f"AND NOT EXISTS((i)<-[:PREFERRED_TO_BY|COMPARE_WITH_BY* {{by:'{ranker.ranker_id}'}}]-(j)) "
+    query += f"WITH i,j, rand() as r "
+    query += "ORDER BY r "
+    query += "RETURN i,j"
+    if limit is not None:
+        query += f" LIMIT {limit}"
+
     results, _ = db.cypher_query(query)
 
     return [(item_class.inflate(row[0]), item_class.inflate(row[1])) for row in results]
 
 
-def get_random_possible_queued_compare(ranker: Ranker, item_class):
-    item_labels = ':'.join(item_class.inherited_labels())
+def populate_queued_compares(ranker: Ranker, item_class, max_created=100):
+    created = 0
+    to_attempt = get_random_possible_queued_compares(ranker, item_class, limit=max_created)
 
-    query = f"MATCH (i:{item_labels}), (j:{item_labels}) "
-    query += f"WHERE EXISTS((:Ranker {{ranker_id:'{ranker.ranker_id}'}})-[:KNOWS]->(i)) "
-    query += f"AND EXISTS((:Ranker {{ranker_id:'{ranker.ranker_id}'}})-[:KNOWS]->(j)) "
-    query += f"AND NOT EXISTS((i)-[:PREFERRED_TO_BY|COMPARE_WITH_BY* {{by:'{ranker.ranker_id}'}}]->(j)) "
-    query += f"AND NOT EXISTS((j)-[:PREFERRED_TO_BY|COMPARE_WITH_BY* {{by:'{ranker.ranker_id}'}}]->(i)) "
-    query += "AND id(i) < id(j) "
-    query += "RETURN i,j, rand() as r "
-    query += "ORDER BY r LIMIT 1"
-    results, _ = db.cypher_query(query)
+    while to_attempt and created < max_created:
+        created += insert_queued_compares(ranker, to_attempt)
+        to_attempt = get_random_possible_queued_compares(ranker, item_class, limit=max_created-created)
+    
 
-    if not results:
-        return None, None
-
-    return item_class.inflate(results[0][0]), item_class.inflate(results[0][1])
-
-
-def populate_queued_compares(ranker: Ranker, item_class):
-    left, right = get_random_possible_queued_compare(ranker, item_class)
-
-    while left is not None:
-        success = insert_queued_compare(ranker, left, right)
-        if not success:
-            break
-        left, right = get_random_possible_queued_compare(ranker, item_class)
-
-def list_undefined_known_items(ranker: Ranker, item_class):
+def list_undefined_known_items(ranker: Ranker, item_class, limit=100):
     item_labels = ':'.join(item_class.inherited_labels())
 
     query = f"MATCH (r:Ranker), (i:{item_labels}) "
     query += f"WHERE r.ranker_id='{ranker.ranker_id}' "
     query += "AND NOT EXISTS((r)-[:KNOWS]->(i)) " 
     query += "AND NOT EXISTS((r)-[:DOES_NOT_KNOW]->(i)) "
-    query += "RETURN i, rand() as x ORDER BY x LIMIT 100"
+    query += "WITH i, rand() as x "
+    query += f"ORDER BY x LIMIT {limit} "
+    query += "RETURN i"
     results, _ = db.cypher_query(query)
 
     return [item_class.inflate(row[0]) for row in results]

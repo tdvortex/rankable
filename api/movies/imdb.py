@@ -8,7 +8,7 @@ from .models import Movie, Star, Genre
 
 def do_populate_movies():
     if settings.DEBUG:
-        f = open('.imdb_apikey', 'r')
+        f = open('api/.imdb_apikey', 'r')
         key = f.read()
         f.close()
     else:
@@ -16,7 +16,7 @@ def do_populate_movies():
 
     offset = Movie.objects.count() + 1
 
-    filename = '.imdb/' + str(offset) + '.json'
+    filename = 'api/.imdb/' + str(offset) + '.json'
 
     if settings.DEBUG and os.path.exists(filename):
         f = open(filename, 'r')
