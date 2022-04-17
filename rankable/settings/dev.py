@@ -17,7 +17,7 @@ ALLOWED_HOSTS = []
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'my_movie_graph',
+        'NAME': 'rankable',
         'USER': 'postgres',
         'HOST': 'localhost',
         'PORT': 5432,
