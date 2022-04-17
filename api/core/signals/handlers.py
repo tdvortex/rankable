@@ -10,7 +10,7 @@ from preferences.cypher import delete_ranker, delete_item
 def create_node_for_new_movie(sender, **kwargs):
     if kwargs['created']:
         created_movie = kwargs['instance']
-        MovieNode(item_id=created_movie.id).save()  
+        MovieNode(item_id=created_movie.id, title=created_movie.title, year=created_movie.year).save()  
 
 @receiver(post_delete, sender=Movie)
 def delete_node_of_deleted_movie(sender, **kwargs):
