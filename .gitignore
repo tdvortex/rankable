@@ -130,6 +130,6 @@ dmypy.json
 .pyre/
 
 .vscode
-.mmg_pass
+.sql_pass
 .apikey
 .imdb/
