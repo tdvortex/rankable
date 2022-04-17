@@ -133,3 +133,4 @@ dmypy.json
 .sql_pass
 .apikey
 .imdb/
+.imdb_apikey
